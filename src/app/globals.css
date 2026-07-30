@@ -1,0 +1,119 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 213 14% 13%; /* #212529 */
+    --foreground: 45 63% 52%; /* #D4AF37 */
+
+    --card: 213 14% 15%;
+    --card-foreground: 45 63% 52%;
+    --popover: 213 14% 11%;
+    --popover-foreground: 45 63% 52%;
+
+    --primary: 45 63% 52%; /* #D4AF37 */
+    --primary-foreground: 213 14% 11%;
+
+    --secondary: 213 14% 20%;
+    --secondary-foreground: 45 63% 52%;
+
+    --muted: 213 14% 20%;
+    --muted-foreground: 45 35% 65%;
+
+    --accent: 45 76% 65%; /* #E6C466 */
+    --accent-foreground: 213 14% 11%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 213 14% 25%;
+    --input: 213 14% 25%;
+    --ring: 45 63% 52%;
+
+    --radius: 0.5rem;
+
+    --chart-1: 45 63% 52%;
+    --chart-2: 45 76% 65%;
+    --chart-3: 45 40% 70%;
+    --chart-4: 45 30% 80%;
+    --chart-5: 45 20% 90%;
+
+    --sidebar-background: 213 14% 13%;
+    --sidebar-foreground: 45 63% 52%;
+    --sidebar-primary: 45 76% 65%;
+    --sidebar-primary-foreground: 213 14% 11%;
+    --sidebar-accent: 213 14% 20%;
+    --sidebar-accent-foreground: 45 76% 65%;
+    --sidebar-border: 213 14% 25%;
+    --sidebar-ring: 45 76% 65%;
+  }
+
+  .dark {
+    --background: 213 14% 13%; /* #212529 */
+    --foreground: 45 63% 52%; /* #D4AF37 */
+
+    --card: 213 14% 15%;
+    --card-foreground: 45 63% 52%;
+    --popover: 213 14% 11%;
+    --popover-foreground: 45 63% 52%;
+
+    --primary: 45 63% 52%; /* #D4AF37 */
+    --primary-foreground: 213 14% 11%;
+
+    --secondary: 213 14% 20%;
+    --secondary-foreground: 45 63% 52%;
+
+    --muted: 213 14% 20%;
+    --muted-foreground: 45 35% 65%;
+
+    --accent: 45 76% 65%; /* #E6C466 */
+    --accent-foreground: 213 14% 11%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 213 14% 25%;
+    --input: 213 14% 25%;
+    --ring: 45 63% 52%;
+
+    --chart-1: 45 63% 52%;
+    --chart-2: 45 76% 65%;
+    --chart-3: 45 40% 70%;
+    --chart-4: 45 30% 80%;
+    --chart-5: 45 20% 90%;
+    
+    --sidebar-background: 213 14% 13%;
+    --sidebar-foreground: 45 63% 52%;
+    --sidebar-primary: 45 76% 65%;
+    --sidebar-primary-foreground: 213 14% 11%;
+    --sidebar-accent: 213 14% 20%;
+    --sidebar-accent-foreground: 45 76% 65%;
+    --sidebar-border: 213 14% 25%;
+    --sidebar-ring: 45 76% 65%;
+  }
+
+  /* Hide spin buttons on number inputs for a cleaner UI */
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type=number] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+     background-image: radial-gradient(
+      circle at var(--x) var(--y),
+      hsl(var(--primary) / 0.1),
+      hsl(var(--background)) 20%
+    );
+  }
+}

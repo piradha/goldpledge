@@ -1,0 +1,200 @@
+
+
+{
+  "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Stores user-specific information, linking them to a shop.",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "shopId": { "type": "string" },
+        "shopName": { "type": "string" },
+        "shopNumber": { "type": "string" },
+        "role": { "type": "string", "enum": ["owner", "staff", "admin"] }
+      },
+      "required": ["email", "shopId", "role", "shopName", "shopNumber"]
+    },
+    "Shop": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Shop",
+      "type": "object",
+      "description": "Represents a single business/tenant in the application.",
+      "properties": {
+        "name": { "type": "string", "description": "The name of the shop." },
+        "ownerId": { "type": "string", "description": "The UID of the user who owns the shop." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "shopNumber": { "type": "string", "description": "A unique, user-facing identifier for the shop." },
+        "address": { "type": "string", "description": "The physical address of the shop." },
+        "phone": { "type": "string", "description": "The contact phone number for the shop." },
+        "logoUrl": { "type": "string", "description": "URL for the shop's logo image." }
+      },
+      "required": ["name", "ownerId", "createdAt", "shopNumber"]
+    },
+    "PledgeItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PledgeItem",
+      "type": "object",
+      "description": "Represents a single item within a pledge.",
+      "properties": {
+        "metalType": { "type": "string", "enum": ["Gold", "Silver"] },
+        "type": { "type": "string" },
+        "quantity": { "type": "number" },
+        "totalWeight": { "type": "number" },
+        "stoneWeight": { "type": "number" },
+        "netWeight": { "type": "number" },
+        "purity": { "type": "number" },
+        "estimatedValue": { "type": "number" }
+      },
+      "required": ["metalType", "type", "quantity", "totalWeight", "netWeight", "purity", "estimatedValue"]
+    },
+    "Customer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Customer",
+      "type": "object",
+      "description": "Represents a customer profile, partitioned by shop.",
+      "properties": {
+        "shopId": { "type": "string" },
+        "name": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "mobileNumber": { "type": "string" },
+        "alternateMobile": { "type": "string" },
+        "idProofType": { "type": "string", "enum": ["Aadhar", "PAN", "Driving Licence", "Others"] },
+        "idProofNumber": { "type": "string" },
+        "address": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "notes": { "type": "string" },
+        "reference": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["shopId", "name", "mobileNumber", "idProofType", "idProofNumber", "address", "createdAt"]
+    },
+    "Pledge": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Pledge",
+      "type": "object",
+      "description": "Represents a pledge, partitioned by shop.",
+      "properties": {
+        "shopId": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "items": { "type": "array", "items": { "$ref": "#/entities/PledgeItem" } },
+        "totalWeight": { "type": "number" },
+        "estimatedValue": { "type": "number" },
+        "loanAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "documentCharges": { "type": "number", "description": "Fixed charges for documentation." },
+        "interestRate": { "type": "number" },
+        "loanDuration": { "type": "number" },
+        "loanDurationType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "itemImageUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["ACTIVE", "OVERDUE", "CLOSED"] }
+      },
+      "required": ["shopId", "customerId", "customerName", "items", "totalWeight", "estimatedValue", "loanAmount", "paidAmount", "interestRate", "loanDuration", "createdAt", "dueDate", "status"]
+    },
+    "Payment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payment",
+      "type": "object",
+      "description": "Represents a payment, partitioned by shop.",
+      "properties": {
+        "shopId": { "type": "string" },
+        "pledgeId": { "type": "string" },
+        "paymentType": { "type": "string", "enum": ["Interest", "Partial", "Settlement"] },
+        "amount": { "type": "number" },
+        "paymentDate": { "type": "string", "format": "date-time" },
+        "lateFee": { "type": "number" },
+        "newDueDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["shopId", "pledgeId", "paymentType", "amount", "paymentDate"]
+    },
+    "InterestTier": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "InterestTier",
+      "type": "object",
+      "description": "Defines an interest rate for a specific duration.",
+      "properties": {
+        "duration": { "type": "number", "description": "The duration of this tier." },
+        "rate": { "type": "number", "description": "The interest rate for this tier." }
+      },
+      "required": ["duration", "rate"]
+    },
+    "Scheme": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Scheme",
+      "type": "object",
+      "description": "Represents a loan scheme, partitioned by shop.",
+      "properties": {
+        "shopId": { "type": "string" },
+        "name": { "type": "string" },
+        "interestTiers": { "type": "array", "items": { "$ref": "#/entities/InterestTier" } },
+        "durationType": { "type": "string", "enum": ["Days", "Months", "Years"] },
+        "advanceInterest": { "type": "boolean" },
+        "overdueInterestRate": { "type": "number" },
+        "maximumEligibility": { "type": "number" },
+        "ratePerGram": { "type": "number" }
+      },
+      "required": ["shopId", "name", "interestTiers", "durationType", "advanceInterest", "overdueInterestRate", "maximumEligibility", "ratePerGram"]
+    },
+    "ItemType": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ItemType",
+      "type": "object",
+      "description": "Item types for a metal, partitioned by shop.",
+      "properties": {
+        "shopId": { "type": "string" },
+        "metalType": { "type": "string", "enum": ["Gold", "Silver"] },
+        "types": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["shopId", "metalType", "types"]
+    },
+    "Counter": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Counter",
+      "type": "object",
+      "description": "A counter for sequential IDs, partitioned by shop.",
+      "properties": { "lastId": { "type": "number" } },
+      "required": ["lastId"]
+    }
+  },
+  "auth": {
+    "providers": ["password"]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores user profile information, linking users to their shop."
+    },
+    "/shops/{shopId}": {
+      "schema": { "$ref": "#/entities/Shop" },
+      "description": "Stores information about each shop (tenant)."
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Stores customer profiles, partitioned by shopId."
+    },
+    "/schemes/{schemeId}": {
+      "schema": { "$ref": "#/entities/Scheme" },
+      "description": "Stores loan schemes, partitioned by shopId."
+    },
+    "/pledges/{pledgeId}": {
+      "schema": { "$ref": "#/entities/Pledge" },
+      "description": "Stores pledges, partitioned by shopId."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Stores payments, partitioned by shopId."
+    },
+    "/itemTypes/{itemTypeId}": {
+      "schema": { "$ref": "#/entities/ItemType" },
+      "description": "Stores item types, where the ID is a composite of metal and shopId."
+    },
+    "/counters/{counterName}": {
+      "schema": { "$ref": "#/entities/Counter" },
+      "description": "Stores counters, where the ID is a composite of counter type and shopId."
+    }
+  }
+}

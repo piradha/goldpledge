@@ -1,0 +1,323 @@
+
+{
+  "entities": {
+    "PledgeItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "PledgeItem",
+      "type": "object",
+      "description": "Represents a single item within a pledge.",
+      "properties": {
+        "metalType": {
+          "type": "string",
+          "description": "The type of metal (e.g., Gold, Silver).",
+          "enum": ["Gold", "Silver"]
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of the gold item (e.g., Ring, Chain)."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "The quantity of this specific item."
+        },
+        "totalWeight": {
+          "type": "number",
+          "description": "Total weight of this item in grams."
+        },
+        "stoneWeight": {
+          "type": "number",
+          "description": "Weight of stones in this item in grams (optional)."
+        },
+        "netWeight": {
+          "type": "number",
+          "description": "Net weight of this item (Total - Stone)."
+        }
+      },
+      "required": ["metalType", "type", "quantity", "totalWeight", "netWeight"]
+    },
+    "Customer": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Customer",
+      "type": "object",
+      "description": "Represents a customer profile.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Customer's full name."
+        },
+        "fatherName": {
+          "type": "string",
+          "description": "Customer's father's name."
+        },
+        "mobileNumber": {
+          "type": "string",
+          "description": "Customer's mobile phone number."
+        },
+        "alternateMobile": {
+          "type": "string",
+          "description": "Customer's alternate mobile phone number."
+        },
+        "aadharNumber": {
+          "type": "string",
+          "description": "DEPRECATED. Use idProofType and idProofNumber instead."
+        },
+        "idProofType": {
+          "type": "string",
+          "description": "Type of ID proof provided by the customer.",
+          "enum": [
+            "Aadhar",
+            "PAN",
+            "Driving Licence",
+            "Others"
+          ]
+        },
+        "idProofNumber": {
+          "type": "string",
+          "description": "The number on the ID proof provided."
+        },
+        "address": {
+          "type": "string",
+          "description": "Customer's address."
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "URL of the customer's photo (optional)."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Notes about the customer."
+        },
+        "reference": {
+          "type": "string",
+          "description": "Reference to another customer ID."
+        }
+      },
+      "required": [
+        "name",
+        "mobileNumber",
+        "idProofType",
+        "idProofNumber",
+        "address"
+      ]
+    },
+    "Pledge": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Pledge",
+      "type": "object",
+      "description": "Represents a pledge entry, which can contain multiple items.",
+      "properties": {
+        "customerId": {
+          "type": "string",
+          "description": "Reference to Customer. (Relationship: Customer 1:N Pledge)"
+        },
+        "items": {
+          "type": "array",
+          "description": "An array of items included in the pledge.",
+          "items": { "$ref": "#/entities/PledgeItem" }
+        },
+        "totalWeight": {
+          "type": "number",
+          "description": "Total net weight of all items in the pledge in grams."
+        },
+        "estimatedValue": {
+          "type": "number",
+          "description": "Total estimated value of all items in the pledge."
+        },
+        "loanAmount": {
+          "type": "number",
+          "description": "Amount of the loan."
+        },
+        "interestRate": {
+          "type": "number",
+          "description": "Interest rate of the loan."
+        },
+        "loanDuration": {
+          "type": "number",
+          "description": "Duration of the loan."
+        },
+        "loanDurationType": {
+          "type": "string",
+          "description": "The type of loan duration (Days/Months/Years)"
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Due date of the loan.",
+          "format": "date-time"
+        },
+        "itemImageUrl": {
+          "type": "string",
+          "description": "URL of the image of the primary gold item."
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the pledge (ACTIVE, OVERDUE, CLOSED)."
+        }
+      },
+      "required": [
+        "customerId",
+        "items",
+        "totalWeight",
+        "estimatedValue",
+        "loanAmount",
+        "interestRate",
+        "loanDuration",
+        "dueDate",
+        "status"
+      ]
+    },
+    "Payment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payment",
+      "type": "object",
+      "description": "Represents a payment made on a pledge.",
+      "properties": {
+        "pledgeId": {
+          "type": "string",
+          "description": "Reference to Pledge. (Relationship: Pledge 1:N Payment)"
+        },
+        "paymentType": {
+          "type": "string",
+          "description": "Type of payment (Monthly Interest, Partial Payment, Full Settlement)."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Amount of the payment."
+        },
+        "paymentDate": {
+          "type": "string",
+          "description": "Date of the payment.",
+          "format": "date-time"
+        },
+        "lateFee": {
+          "type": "number",
+          "description": "Late fee charged (optional)."
+        },
+        "newDueDate": {
+          "type": "string",
+          "description": "New due date after payment (if applicable).",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "pledgeId",
+        "paymentType",
+        "amount",
+        "paymentDate"
+      ]
+    },
+    "Release": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Release",
+      "type": "object",
+      "description": "Represents the release of a pledged item.",
+      "properties": {
+        "pledgeId": {
+          "type": "string",
+          "description": "Reference to Pledge. (Relationship: Pledge 1:1 Release)"
+        },
+        "settlementAmount": {
+          "type": "number",
+          "description": "Final settlement amount."
+        },
+        "releaseDate": {
+          "type": "string",
+          "description": "Date of the release.",
+          "format": "date-time"
+        },
+        "releasedBy": {
+          "type": "string",
+          "description": "User ID of the user who released the item."
+        }
+      },
+      "required": [
+        "pledgeId",
+        "settlementAmount",
+        "releaseDate",
+        "releasedBy"
+      ]
+    },
+    "Scheme": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Scheme",
+      "type": "object",
+      "description": "Represents a loan scheme.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the scheme."
+        },
+        "duration": {
+          "type": "number",
+          "description": "Duration of the scheme."
+        },
+        "durationType": {
+          "type": "string",
+          "enum": [
+            "Days",
+            "Months",
+            "Years"
+          ],
+          "description": "Type of the duration (Days, Months, Years)."
+        },
+        "interestRate": {
+          "type": "number",
+          "description": "Interest rate for the scheme."
+        },
+        "advanceInterest": {
+          "type": "boolean",
+          "description": "Whether advance interest is taken."
+        },
+        "overdueInterestRate": {
+          "type": "number",
+          "description": "Interest rate after the duration is over."
+        },
+        "maximumEligibility": {
+          "type": "number",
+          "description": "Maximum loan amount for the scheme."
+        },
+        "ratePerGram": {
+          "type": "number",
+          "description": "The monetary value (e.g., in INR) per gram for this scheme."
+        }
+      },
+      "required": [
+        "name",
+        "duration",
+        "durationType",
+        "interestRate",
+        "advanceInterest",
+        "overdueInterestRate",
+        "maximumEligibility",
+        "ratePerGram"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "collections": {
+      "/customers/{customerId}": {
+        "schema": {
+          "$ref": "#/entities/Customer"
+        },
+        "description": "Stores customer profile information."
+      },
+      "/schemes/{schemeId}": {
+        "schema": {
+          "$ref": "#/entities/Scheme"
+        },
+        "description": "Stores loan scheme information."
+      },
+      "/pledges/{pledgeId}": {
+        "schema": {
+          "$ref": "#/entities/Pledge"
+        },
+        "description": "Stores pledge information for all customers in a single root collection."
+      }
+    }
+  }
+}
