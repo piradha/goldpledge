@@ -13,7 +13,7 @@ import { MoreHorizontal, PlusCircle, Search, Trash2, Printer, Calendar as Calend
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
-
+import {  Scheme} from '@/lib/types';
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, doc, deleteDoc } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,7 +25,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
+import { Scale ,Banknote} from "lucide-react";
 
 function PledgeRowSkeleton() {
     return (
@@ -45,8 +45,23 @@ function PledgeRowSkeleton() {
     )
 }
 
-function PledgeRow({ pledge, userProfile }: { pledge: Pledge, userProfile: UserProfile | null }) {
-    const { interestDue: grossInterestAccrued } = calculateInterest(pledge);
+function PledgeRow({
+  pledge,
+  userProfile,
+  schemes,
+}: {
+  pledge: Pledge;
+  userProfile: UserProfile | null;
+  schemes?: Scheme[] | null;
+}) {
+  const scheme = useMemo(() => {
+    if (!schemes || !pledge?.schemeId) {
+      return null;
+    }
+
+    return schemes.find((s) => s.id === pledge.schemeId) ?? null;
+  }, [schemes, pledge?.schemeId]);
+    const { interestDue: grossInterestAccrued } = calculateInterest(pledge,scheme,new Date());
     const interestPaid = pledge.interestPaid || 0;
     const currentInterestDue = Math.max(0, grossInterestAccrued - interestPaid);
     const outstandingPrincipal = pledge.loanAmount - pledge.paidAmount;
@@ -193,6 +208,11 @@ export default function PledgesList() {
     );
     const { data: userProfiles, isLoading: isLoadingProfile } = useCollection<UserProfile>(userProfileQuery);
     const userProfile = useMemo(() => (userProfiles && userProfiles[0]) ? userProfiles[0] : null, [userProfiles]);
+  const schemesQuery = useMemoFirebase(
+    () => (firestore && userProfile ? query(collection(firestore, "schemes"), where("shopId", "==", userProfile.shopId)) : null),
+    [firestore, userProfile]
+  );
+  const { data: schemes, isLoading: isLoadingSchemes } = useCollection<Scheme>(schemesQuery);
 
     const customersQuery = useMemoFirebase(
         () => (firestore && userProfile ? query(collection(firestore, 'customers'), where('shopId', '==', userProfile.shopId)) : null),
@@ -250,15 +270,74 @@ export default function PledgesList() {
 
     }, [pledges, searchTerm, statusFilter, metalTypeFilter, startDate, endDate]);
 
-
+ const activePledges = filteredPledges?.filter(p => p.status === 'ACTIVE' || p.status === 'OVERDUE') || [];
+   const totalLoanAmount = activePledges.reduce((sum, p) => sum + Number(p.loanAmount), 0);
+  const { totalGoldWeight, totalSilverWeight,totalPacket } = useMemo(() => {
+    return activePledges.reduce(
+      (acc, pledge) => {
+        pledge.items.forEach(item => {
+          if (item.metalType === 'Gold') {
+            acc.totalGoldWeight += Number(item.netWeight) || 0;
+          } else if (item.metalType === 'Silver') {
+            acc.totalSilverWeight += Number(item.netWeight) || 0;
+          }
+          acc.totalPacket++;
+        });
+        return acc;
+      },
+      { totalGoldWeight: 0, totalSilverWeight: 0,totalPacket:0 }
+    );
+  }, [activePledges]);
 
 
     const showLoading = isLoadingPledges || isLoadingCustomers || isUserLoading || isLoadingProfile;
 
 
+function MetricCard({ icon: Icon, title, value, isLoading }: { icon: React.ElementType, title: string, value: string | number, isLoading: boolean }) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground text-primary" />
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-8 w-3/4" />
+        ) : (
+          <div className="text-2xl font-bold">{value}</div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
     return (
+        
         <Card>
             <CardHeader>
+                <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <MetricCard
+          icon={Scale}
+          title="Total Gold Pledged"
+          value={`${totalGoldWeight.toFixed(2)}g`}
+          isLoading={showLoading}
+        /><MetricCard
+          icon={Scale}
+          title="Total Silver Pledged"
+          value={`${totalSilverWeight.toFixed(2)}g`}
+          isLoading={showLoading}
+        /><MetricCard
+          icon={Scale}
+          title="Total Packet"
+          value={`${totalPacket}`}
+          isLoading={showLoading}
+        />
+       <MetricCard
+          icon={Banknote}
+          title="Total Active Loan"
+          value={`₹${Math.round(totalLoanAmount).toLocaleString('en-IN')}`}
+          isLoading={showLoading}
+        />
+        </div>
                 <div className="flex flex-col md:flex-row items-center gap-4">
                     <CardTitle className="flex-1">
                         {customer ? `Pledges for ${customer.name}` : 'All Pledges'}
@@ -372,6 +451,7 @@ export default function PledgesList() {
                                 key={pledge.id}
                                 pledge={pledge}
                                 userProfile={userProfile}
+                                schemes={schemes}
                             />
                         ))}
                     </TableBody>

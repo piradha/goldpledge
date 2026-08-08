@@ -68,6 +68,7 @@ export const PledgeVoucher = React.forwardRef<HTMLDivElement, PledgeVoucherProps
                     <h1 className="font-bold text-6xl text-destructive mt-2">ஸ்ரீ லெக்ஷ்மி & கோ</h1>
                 <p className="pt-2.5 text-3xl">{shop.address}</p>
                 <p className="text-2xl font-bold">{shop.phone}</p>
+                
             </div>
             
             <div className="flex justify-between items-start">
@@ -103,10 +104,35 @@ export const PledgeVoucher = React.forwardRef<HTMLDivElement, PledgeVoucherProps
                     <p className="text-2xl font-bold">{customer.mobileNumber}</p>
                     <p className="font-bold">Loan Amount in words : Rupees {numberToWords.toWords(pledge.loanAmount)} only</p>
                 </div>
-                <div className="col-span-1 flex gap-1 items-center justify-center">
-                    {customer.photoUrl && <Image src={customer.photoUrl} alt="Customer" width={200} height={250} className="object-cover border border-black" />}
-                    {pledge.itemImageUrl && <Image src={pledge.itemImageUrl} alt="Item" width={200} height={250} className="object-cover border border-black" />}
-                </div>
+                <div className="col-span-1 flex items-start justify-end gap-2">
+  {customer.photoUrl ? (
+    <Image
+      src={customer.photoUrl}
+      alt="Customer"
+      width={150}
+      height={180}
+      className="h-[180px] w-[150px] object-cover border border-black"
+    />
+  ) : (
+    <div className="h-[180px] w-[150px] border border-black flex items-center justify-center">
+      No Customer Photo
+    </div>
+  )}
+
+  {pledge.itemImageUrl ? (
+    <Image
+      src={pledge.itemImageUrl}
+      alt="Pledged Item"
+      width={150}
+      height={180}
+      className="h-[180px] w-[150px] object-cover border border-black"
+    />
+  ) : (
+    <div className="h-[180px] w-[150px] border border-black flex items-center justify-center">
+      No Item Photo
+    </div>
+  )}
+</div>
             </div>
 
             {/* Items Table */}
