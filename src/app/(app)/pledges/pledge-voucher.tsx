@@ -109,8 +109,8 @@ export const PledgeVoucher = React.forwardRef<HTMLDivElement, PledgeVoucherProps
     <Image
       src={customer.photoUrl}
       alt="Customer"
-      width={150}
-      height={180}
+      width={200}
+      height={230}
       className="h-[180px] w-[150px] object-cover border border-black"
     />
   ) : (
@@ -123,8 +123,8 @@ export const PledgeVoucher = React.forwardRef<HTMLDivElement, PledgeVoucherProps
     <Image
       src={pledge.itemImageUrl}
       alt="Pledged Item"
-      width={150}
-      height={180}
+      width={200}
+      height={230}
       className="h-[180px] w-[150px] object-cover border border-black"
     />
   ) : (
