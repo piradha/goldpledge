@@ -53,8 +53,15 @@ export async function addPledge(firestore: Firestore, pledgeData: Omit<Pledge, '
     const newPledgeId = await getNextPledgeId(firestore, shop);
     const newPledgeRef = doc(firestore, 'pledges', newPledgeId);
 
+    const sanitizedPledge: any = {};
+    for (const [key, value] of Object.entries(pledgeData)) {
+        if (value !== undefined) {
+            sanitizedPledge[key] = value;
+        }
+    }
+
     const newPledge: Pledge = {
-        ...pledgeData,
+        ...sanitizedPledge,
         id: newPledgeId,
         status: 'ACTIVE',
         paidAmount: 0,
@@ -124,32 +131,41 @@ export async function addPaymentAndUpdatePledge(
         }
 
         const pledge = pledgeDoc.data() as Pledge;
-        let newPaidAmount = pledge.paidAmount;
-        let newInterestPaid = pledge.interestPaid || 0;
+        const currentPaidAmount = Number(pledge.paidAmount) || 0;
+        const currentInterestPaid = Number(pledge.interestPaid) || 0;
+        const loanAmount = Number(pledge.loanAmount) || 0;
+        const paymentAmount = Number(paymentData.amount) || 0;
+        const validPrincipalPayment = Number(principalPayment) || 0;
+
+        let newPaidAmount = currentPaidAmount;
+        let newInterestPaid = currentInterestPaid;
 
         const updates: any = {};
 
         if (paymentData.paymentType === 'Interest') {
-            newInterestPaid += paymentData.amount;
+            newInterestPaid += paymentAmount;
             updates.interestPaid = newInterestPaid;
         } else if (paymentData.paymentType === 'Partial' || paymentData.paymentType === 'Settlement') {
-            newPaidAmount += principalPayment;
+            newPaidAmount += validPrincipalPayment;
             updates.paidAmount = newPaidAmount;
 
             // In settlement, also track interest paid if any part of the payment was interest
             // Usually Settlement amount = principal + interest. 
             // The caller passes principalPayment. Interest component = paymentData.amount - principalPayment
-            const interestComponent = paymentData.amount - principalPayment;
+            const interestComponent = paymentAmount - validPrincipalPayment;
             if (interestComponent > 0) {
                 newInterestPaid += interestComponent;
                 updates.interestPaid = newInterestPaid;
             }
 
             // Auto-close on settlement or if fully paid
-            if (paymentData.paymentType === 'Settlement' || newPaidAmount >= pledge.loanAmount) {
+            if (paymentData.paymentType === 'Settlement' || newPaidAmount >= loanAmount) {
                 updates.status = 'CLOSED';
-                if (pledge.bankCoverage) {
-                    updates['bankCoverage.status'] = 'Released';
+                if (pledge.bankCoverage && typeof pledge.bankCoverage === 'object') {
+                    updates.bankCoverage = {
+                        ...pledge.bankCoverage,
+                        status: 'Released'
+                    };
                 }
             }
         }
@@ -159,10 +175,12 @@ export async function addPaymentAndUpdatePledge(
         }
 
         const newPayment: Payment = {
-            ...paymentData,
             id: paymentRef.id,
             pledgeId: pledgeId,
             shopId: pledge.shopId,
+            paymentType: paymentData.paymentType,
+            amount: paymentAmount,
+            adjustment: Number(paymentData.adjustment) || 0,
             paymentDate: paymentData.paymentDate || new Date().toISOString(),
         };
 
@@ -196,8 +214,8 @@ export async function releasePledge(firestore: Firestore, pledgeId: string) {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(d => d.data() as Payment);
 
-        const { interestDue } = calculateInterest(pledge, new Date(), payments);
-        const outstandingPrincipal = pledge.loanAmount - pledge.paidAmount;
+        const { interestDue } = calculateInterest(pledge, null, new Date(), payments);
+        const outstandingPrincipal = (Number(pledge.loanAmount) || 0) - (Number(pledge.paidAmount) || 0);
         const totalOutstanding = outstandingPrincipal + interestDue;
 
         if (totalOutstanding > 0.1) { // Allow for small rounding differences

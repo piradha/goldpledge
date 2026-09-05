@@ -3,8 +3,8 @@
 
 import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
-import { useDoc, useFirebase, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { useDoc, useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { doc, query, collection, where } from 'firebase/firestore';
 import { Customer, Pledge, Shop, Payment } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PaymentReceipt } from '@/app/(app)/pledges/payment-receipt';

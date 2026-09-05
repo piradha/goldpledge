@@ -29,8 +29,8 @@ export const PaymentReceipt = React.forwardRef<HTMLDivElement, PaymentReceiptPro
         return <div ref={ref} className="p-8 text-center text-red-500">Missing data to generate receipt.</div>;
     }
 
-    const { interestDue: interestAfterPayment } = calculateInterest(pledge, new Date(payment.paymentDate), allPayments || []);
-    const outstandingPrincipalAfterPayment = pledge.loanAmount - pledge.paidAmount;
+    const { interestDue: interestAfterPayment } = calculateInterest(pledge, null, new Date(payment.paymentDate), allPayments || []);
+    const outstandingPrincipalAfterPayment = (Number(pledge.loanAmount) || 0) - (Number(pledge.paidAmount) || 0);
     const totalOutstandingAfterPayment = outstandingPrincipalAfterPayment + interestAfterPayment;
 
     const renderReceiptHalf = (key: string) => (

@@ -117,7 +117,7 @@ export function getInterestRateForMonth(pledge: Pledge, monthIndex: number): num
  */
 export function calculateInterest(
   pledge: Pledge,
-  scheme: Scheme | null | undefined,
+  scheme: Scheme | null | undefined = null,
   evaluationDate: Date = new Date(),
   payments: Payment[] = []
 ): { interestDue: number; monthsPassed: number; breakdown: InterestBreakdownItem[],rate:number } {

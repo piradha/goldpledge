@@ -146,8 +146,7 @@ export default function PledgeDetailPage() {
     );
     const { data: payments, isLoading: isLoadingPayments } = useCollection<Payment>(paymentsQuery);
 
-    const isLoading = isLoadingPledge || isLoadingCustomer || isLoadingProfile || isLoadingPayments || isLoadingSchemes||
-  !scheme; 
+    const isLoading = isLoadingPledge || isLoadingCustomer || isLoadingProfile || isLoadingPayments || isLoadingSchemes; 
 
     // Security check: ensure the pledge belongs to the user's shop
     if (pledge && userProfile && pledge.shopId !== userProfile.shopId) {

@@ -8,10 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { doc, query, where, collection } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { calculateInterest } from '@/lib/interest';
-import { ArrowLeft, CheckCircle, Printer } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Printer, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { useForm } from 'react-hook-form';
+import { useForm, FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -139,9 +139,9 @@ export default function MakePaymentPage() {
     };
 
     const { interestDue: gross, monthsPassed, breakdown,rate } = calculateInterest(pledge,scheme, selectedPaymentDate || new Date(), payments || []);
-    const paid = pledge.interestPaid || 0;
+    const paid = Number(pledge.interestPaid) || 0;
     const due = Math.max(0, gross - paid);
-    const outstanding = pledge.loanAmount - pledge.paidAmount;
+    const outstanding = (Number(pledge.loanAmount) || 0) - (Number(pledge.paidAmount) || 0);
     const total = outstanding + due;
 
     // Calculate months and days duration
@@ -205,8 +205,8 @@ export default function MakePaymentPage() {
     
     if (paymentType === 'Interest') {
       // Use outstanding principal (after partial payments), not the original loan amount
-      const outstanding = pledge.loanAmount - pledge.paidAmount;
-      const oneMonthInterest = outstanding * (pledge.interestRate / 100);
+      const outstanding = (Number(pledge.loanAmount) || 0) - (Number(pledge.paidAmount) || 0);
+      const oneMonthInterest = outstanding * ((Number(pledge.interestRate) || 0) / 100);
       form.setValue('amount', parseFloat((oneMonthInterest * (monthsToPay || 1)).toFixed(2)));
     } else if (paymentType === 'Settlement') {
       form.setValue('amount', parseFloat(totalDueForSettlement.toFixed(0)));
@@ -226,8 +226,7 @@ export default function MakePaymentPage() {
       )
   }
 
-  const isLoading = isLoadingPledge || isLoadingCustomer || isLoadingPayments|| isLoadingSchemes||
-  !scheme;
+  const isLoading = isLoadingPledge || isLoadingCustomer || isLoadingPayments || isLoadingSchemes;
 
   if (isLoading) {
     return <MakePaymentSkeleton />;
@@ -252,24 +251,57 @@ export default function MakePaymentPage() {
     );
   }
 
-  // These values are now calculated via useMemo above
+  const onInvalid = (errors: FieldErrors<z.infer<typeof formSchema>>) => {
+    console.error('MakePayment form validation failed:', errors);
+    const firstErrorMessage = Object.values(errors)[0]?.message || 'Please check all required fields.';
+    toast({
+      variant: 'destructive',
+      title: 'Validation Error',
+      description: String(firstErrorMessage),
+    });
+  };
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!firestore) return;
-
-    if (values.paymentType === 'Partial' && currentInterestDue > 0.1) {
+    if (!firestore) {
       toast({
         variant: 'destructive',
-        title: 'Validation Error',
-        description: 'Outstanding interest must be fully paid before paying principal.',
+        title: 'Connection Error',
+        description: 'Firestore is not initialized. Please refresh and try again.',
       });
       return;
+    }
+
+    if (values.paymentType === 'Partial') {
+      if (currentInterestDue > 0.1) {
+        toast({
+          variant: 'destructive',
+          title: 'Validation Error',
+          description: 'Outstanding interest must be fully paid before paying principal.',
+        });
+        return;
+      }
+      if (!values.amount || values.amount <= 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Validation Error',
+          description: 'Please enter a valid partial payment amount greater than ₹0.',
+        });
+        return;
+      }
+      if (values.amount > outstandingPrincipal) {
+        toast({
+          variant: 'destructive',
+          title: 'Validation Error',
+          description: `Payment cannot exceed outstanding principal of ₹${outstandingPrincipal.toLocaleString('en-IN')}.`,
+        });
+        return;
+      }
     }
 
     const paymentData: Omit<Payment, 'id' | 'pledgeId' | 'shopId'> = {
       amount: finalPaymentAmount, // Use the final calculated amount
       paymentType: values.paymentType,
-      adjustment: values.adjustment,
+      adjustment: Number(values.adjustment) || 0,
       paymentDate: values.paymentDate.toISOString(),
     };
 
@@ -286,14 +318,18 @@ export default function MakePaymentPage() {
 
       setLastPaymentId(paymentId);
       setShowSuccessDialog(true);
-      window.open(`/print/payment/${paymentId}`, '_blank');
+      try {
+        window.open(`/print/payment/${paymentId}`, '_blank');
+      } catch (e) {
+        console.warn('Popup blocked for receipt print:', e);
+      }
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error making payment:', error);
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to record payment. Please try again.',
+        title: 'Payment Error',
+        description: error?.message || 'Failed to record payment. Please try again.',
       });
     }
   };
@@ -471,7 +507,7 @@ export default function MakePaymentPage() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(handleSubmit, onInvalid)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="paymentDate"
@@ -519,7 +555,7 @@ export default function MakePaymentPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Payment Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select payment type" />
@@ -606,10 +642,13 @@ export default function MakePaymentPage() {
 
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => router.back()}>
+                  <Button type="button" variant="outline" onClick={() => router.back()} disabled={form.formState.isSubmitting}>
                     Cancel
                   </Button>
-                  <Button type="submit">Record Payment</Button>
+                  <Button type="submit" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {form.formState.isSubmitting ? 'Recording Payment...' : 'Record Payment'}
+                  </Button>
                 </div>
               </form>
             </Form>
