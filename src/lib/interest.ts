@@ -12,23 +12,31 @@ export interface InterestBreakdownItem {
  * Helper to calculate calendar months passed since the start date.
  * E.g., Oct 8 to Nov 8 is 1 month. Nov 9 enters Month 2, so 2 months passed.
  */
-function calculateCalendarMonthsPassed(startDate: Date, evaluationDate: Date): number {
-  if (evaluationDate <= startDate) return 0;
-  
+function calculateCalendarMonthsPassed(
+  startDate: Date,
+  evaluationDate: Date
+): number {
+  if (evaluationDate <= startDate) {
+    return 0;
+  }
+
   const startYear = startDate.getFullYear();
   const startMonth = startDate.getMonth();
   const startDay = startDate.getDate();
-  
+
   const evalYear = evaluationDate.getFullYear();
   const evalMonth = evaluationDate.getMonth();
   const evalDay = evaluationDate.getDate();
-  
-  let months = (evalYear - startYear) * 12 + (evalMonth - startMonth);
-  
-  if (evalDay > startDay) {
-    months += 1;
+
+  let months =
+    (evalYear - startYear) * 12 +
+    (evalMonth - startMonth);
+
+  // Only count a month after the anniversary day is reached.
+  if (evalDay < startDay) {
+    months -= 1;
   }
-  
+
   return Math.max(0, months);
 }
 
@@ -40,10 +48,10 @@ function addCalendarMonths(date: Date, months: number): Date {
   const targetDay = date.getDate();
   newDate.setDate(1);
   newDate.setMonth(newDate.getMonth() + months);
-  
+
   const targetMonth = newDate.getMonth();
   newDate.setDate(targetDay);
-  
+
   // If we rolled over to the next month due to shorter month length (e.g. Feb 31 -> March 3),
   // set the date to the last day of the target month.
   if (newDate.getMonth() !== targetMonth) {
@@ -120,14 +128,14 @@ export function calculateInterest(
   scheme: Scheme | null | undefined = null,
   evaluationDate: Date = new Date(),
   payments: Payment[] = []
-): { interestDue: number; monthsPassed: number; breakdown: InterestBreakdownItem[],rate:number } {
+): { interestDue: number; monthsPassed: number; breakdown: InterestBreakdownItem[], rate: number } {
   if (!pledge.createdAt || pledge.status === 'CLOSED') {
-    return { interestDue: 0, monthsPassed: 0, breakdown: [],rate:0 };
+    return { interestDue: 0, monthsPassed: 0, breakdown: [], rate: 0 };
   }
 
   const startDate = new Date(pledge.createdAt);
   startDate.setHours(0, 0, 0, 0);
-  
+
   const evaluation = new Date(evaluationDate);
   evaluation.setHours(0, 0, 0, 0);
 
@@ -163,27 +171,27 @@ export function calculateInterest(
     const startMonthIndex = Math.max(1, totalMonthsPassed - monthsPassedSincePayment + 1);
     const breakdown: InterestBreakdownItem[] = [];
 
-   const currentRate = getApplicableInterestRate(pledge, scheme|| null || undefined,totalMonthsPassed);
+    const currentRate = getApplicableInterestRate(pledge, scheme || null || undefined, totalMonthsPassed);
 
-for (let m = startMonthIndex; m <= totalMonthsPassed; m++) {
+    for (let m = startMonthIndex; m <= totalMonthsPassed; m++) {
 
-    const monthlyInterest =
+      const monthlyInterest =
         outstandingPrincipal * (currentRate / 100);
 
-    interestAccruedSincePayment += monthlyInterest;
+      interestAccruedSincePayment += monthlyInterest;
 
-    breakdown.push({
+      breakdown.push({
         monthIndex: m,
         rate: currentRate,
         principal: outstandingPrincipal,
         interestAccrued: monthlyInterest
-    });
-}
+      });
+    }
     // Total interest accrued over the life of the pledge
     const totalInterest = interestPaidBeforeOrAtLastPartial + interestAccruedSincePayment;
 
-    return { 
-      interestDue: Math.max(0, totalInterest), 
+    return {
+      interestDue: Math.max(0, totalInterest),
       monthsPassed: monthsPassedSincePayment,
       breakdown,
       rate: currentRate
@@ -193,32 +201,32 @@ for (let m = startMonthIndex; m <= totalMonthsPassed; m++) {
   // Fallback to original calculation when there are no partial payments
   const monthsPassed = calculateCalendarMonthsPassed(startDate, evaluation);
   const billableMonths = Math.max(0, monthsPassed - 1);
-  
+
   if (billableMonths === 0) {
-    return { interestDue: 0, monthsPassed, breakdown: [],rate:0 };
+    return { interestDue: 0, monthsPassed, breakdown: [], rate: 0 };
   }
 
   const outstandingPrincipal = pledge.loanAmount - pledge.paidAmount;
   let totalInterest = 0;
   const breakdown: InterestBreakdownItem[] = [];
-  const currentRate = getApplicableInterestRate(pledge, scheme|| null || undefined, monthsPassed);
+  const currentRate = getApplicableInterestRate(pledge, scheme || null || undefined, monthsPassed);
 
-for (let m = 2; m <= monthsPassed; m++) {
+  for (let m = 2; m <= monthsPassed; m++) {
 
     const monthlyInterest =
-        outstandingPrincipal * (currentRate / 100);
+      outstandingPrincipal * (currentRate / 100);
 
     totalInterest += monthlyInterest;
 
     breakdown.push({
-        monthIndex: m,
-        rate: currentRate,
-        principal: outstandingPrincipal,
-        interestAccrued: monthlyInterest
+      monthIndex: m,
+      rate: currentRate,
+      principal: outstandingPrincipal,
+      interestAccrued: monthlyInterest
     });
-}
-  return { 
-    interestDue: Math.max(0, totalInterest), 
+  }
+  return {
+    interestDue: Math.max(0, totalInterest),
     monthsPassed,
     breakdown,
     rate: currentRate
