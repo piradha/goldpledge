@@ -84,7 +84,30 @@ export type Pledge = {
     notes?: string;
     itemImageUrl?: string;
     bankCoverage?: bankCoverage;
+    isRepledge?: boolean;
+    previousPledgeId?: string | null;
+    previousPledgeDocId?: string | null;
+    repledgeDate?: string | null;
 };
+
+export interface RepledgeHistoryItem {
+    id: string; // Document ID
+    pledgeId: string; // Business Pledge ID
+    customerId?: string;
+    customerName?: string;
+    createdAt?: string;
+    loanAmount: number;
+    paidAmount: number;
+    interestPaid?: number;
+    interestRate?: number;
+    status: 'ACTIVE' | 'OVERDUE' | 'CLOSED' | string;
+    isCurrent: boolean;
+    historyLevel: number;
+    repledgeDate?: string | null;
+    isUnavailable?: boolean;
+    notes?: string;
+    pledge?: Pledge;
+}
 
 export type BankPledgeGroup = {
     id: string;

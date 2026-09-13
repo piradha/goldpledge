@@ -200,35 +200,48 @@ export function calculateInterest(
 
   // Fallback to original calculation when there are no partial payments
   const monthsPassed = calculateCalendarMonthsPassed(startDate, evaluation);
-  const billableMonths = Math.max(0, monthsPassed - 1);
+  const billableMonths = monthsPassed;
 
   if (billableMonths === 0) {
-    return { interestDue: 0, monthsPassed, breakdown: [], rate: 0 };
+    return {
+      interestDue: 0,
+      monthsPassed,
+      breakdown: [],
+      rate: 0
+    };
   }
 
   const outstandingPrincipal = pledge.loanAmount - pledge.paidAmount;
+
   let totalInterest = 0;
   const breakdown: InterestBreakdownItem[] = [];
-  const currentRate = getApplicableInterestRate(pledge, scheme || null || undefined, monthsPassed);
 
-  for (let m = 2; m <= monthsPassed; m++) {
+  for (let m = 1; m <= monthsPassed; m++) {
+    const monthRate = getApplicableInterestRate(
+      pledge,
+      scheme ?? undefined,
+      m
+    );
 
     const monthlyInterest =
-      outstandingPrincipal * (currentRate / 100);
+      outstandingPrincipal * (monthRate / 100);
 
     totalInterest += monthlyInterest;
 
     breakdown.push({
       monthIndex: m,
-      rate: currentRate,
+      rate: monthRate,
       principal: outstandingPrincipal,
       interestAccrued: monthlyInterest
     });
   }
+
   return {
     interestDue: Math.max(0, totalInterest),
     monthsPassed,
     breakdown,
-    rate: currentRate
+    rate: breakdown.length > 0
+      ? breakdown[breakdown.length - 1].rate
+      : 0
   };
 }

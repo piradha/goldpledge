@@ -19,6 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { useMemo, useRef } from 'react';
 import { ImagePreviewDialog } from '../../customers/image-preview-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
+import { RepledgeHistoryCard } from '@/app/(app)/pledges/repledge-history-card';
 
 function PledgeDetailSkeleton() {
     return (
@@ -290,6 +291,8 @@ export default function PledgeDetailPage() {
                             </Table>
                         </CardContent>
                     </Card>
+
+                    <RepledgeHistoryCard pledge={pledge} variant="table" />
                 </div>
 
                 <div className="space-y-6">

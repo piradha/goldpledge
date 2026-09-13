@@ -620,6 +620,10 @@ export function CreatePledgeForm({ editId }: { editId?: string }) {
             notes: values.notes || '',
             itemImageUrl: values.itemImageUrl || '',
             interestPaid: editPledge?.interestPaid || 0,
+            isRepledge: Boolean(repledgeId),
+            previousPledgeId: repledgeId ? (sourcePledge?.id || repledgeId) : null,
+            previousPledgeDocId: repledgeId ? (sourcePledge?.id || repledgeId) : null,
+            repledgeDate: repledgeId ? new Date().toISOString() : null,
         };
     };
 

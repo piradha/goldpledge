@@ -68,6 +68,19 @@ export async function addPledge(firestore: Firestore, pledgeData: Omit<Pledge, '
         interestPaid: 0,
     };
 
+    if (oldPledgeId) {
+        newPledge.isRepledge = true;
+        if (!newPledge.previousPledgeDocId) {
+            newPledge.previousPledgeDocId = oldPledgeId;
+        }
+        if (!newPledge.previousPledgeId) {
+            newPledge.previousPledgeId = oldPledgeId;
+        }
+        if (!newPledge.repledgeDate) {
+            newPledge.repledgeDate = new Date().toISOString();
+        }
+    }
+
     await setDoc(newPledgeRef, newPledge).catch(error => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
             path: newPledgeRef.path,

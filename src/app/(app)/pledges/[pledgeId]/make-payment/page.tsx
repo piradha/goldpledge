@@ -28,6 +28,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
+import { RepledgeHistoryCard } from '@/app/(app)/pledges/repledge-history-card';
 
 const formSchema = z.object({
   paymentType: z.enum(['Interest', 'Partial', 'Settlement'], { required_error: 'Please select a payment type.' }),
@@ -347,159 +348,163 @@ export default function MakePaymentPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-        <Card>
-          <CardHeader>
-            <CardTitle>Pledge Summary for {pledge.customerName}</CardTitle>
-            <CardDescription>Pledge ID: {pledge.id}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 text-base sm:text-lg">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Loan Amount:</span>
-              <span className="font-medium">₹{pledge.loanAmount.toLocaleString('en-IN')}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Principal Paid:</span>
-              <span className="font-medium text-green-500">₹{pledge.paidAmount.toLocaleString('en-IN')}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Outstanding Principal:</span>
-              <span className="font-medium">₹{outstandingPrincipal.toLocaleString('en-IN')}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Loan Date:</span>
-              <span className="font-medium">
-                {pledge.createdAt ? format(new Date(pledge.createdAt), 'dd-MMM-yyyy') : '-'}
-              </span>
-            </div>
-             <div className="flex justify-between">
-  <span className="text-muted-foreground">Scheme Name:</span>
-
-  <TooltipProvider>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="cursor-pointer text-primary underline underline-offset-2">
-          {pledge.schemeName}
-        </span>
-      </TooltipTrigger>
-
-      <TooltipContent className="p-3 w-56">
-        <div className="space-y-1">
-          <div className="font-semibold mb-2">Interest Tiers</div>
-
-          {scheme?.interestTiers?.length ? (
-            [...scheme.interestTiers]
-              .sort((a, b) => a.duration - b.duration)
-              .map((tier, index) => (
-                <div
-                  key={index}
-                  className="flex justify-between text-sm"
-                >
-                  <span>Month {tier.duration}</span>
-                  <span>{tier.rate}%</span>
-                </div>
-              ))
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              No interest tiers configured
-            </div>
-          )}
-        </div>
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
-</div>
-<div className="flex justify-between">
-  <span className="text-muted-foreground">
-    Current Interest:
-  </span>
-
-  <span className="font-semibold text-amber-600">
-    {rate}% P.M
-  </span>
-</div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Rate of Interest:</span>
-              <span className="font-medium">
-                {pledge.interestTiers && pledge.interestTiers.length > 0 
-                  ? `${pledge.interestRate}% p.m. (Tiered)` 
-                  : `${pledge.interestRate}% p.m.`}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Duration:</span>
-              <span className="font-medium">{durationText}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">
-                Interest Accrued {selectedPaymentDate ? `(till ${format(selectedPaymentDate, 'MMM do')})` : ''}:
-              </span>
-              <span className="font-medium text-amber-500">
-                ₹{Math.round(grossInterestAccrued).toLocaleString('en-IN')}
-              </span>
-            </div>
-
-            <div className="pl-4 border-l-2 border-amber-200 dark:border-amber-900 space-y-1.5 py-0.5 my-1">
-              <div className="flex justify-between text-sm sm:text-base text-muted-foreground">
-                <span>Total Months Passed:</span>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pledge Summary for {pledge.customerName}</CardTitle>
+              <CardDescription>Pledge ID: {pledge.id}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 text-base sm:text-lg">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Loan Amount:</span>
+                <span className="font-medium">₹{pledge.loanAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Principal Paid:</span>
+                <span className="font-medium text-green-500">₹{pledge.paidAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Outstanding Principal:</span>
+                <span className="font-medium">₹{outstandingPrincipal.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Loan Date:</span>
                 <span className="font-medium">
-                  {lastPartialDateText 
-                    ? `${monthsPassed} months (since payment on ${lastPartialDateText})`
-                    : `${monthsPassed} months (${Math.max(0, monthsPassed - 1)} billable)`}
+                  {pledge.createdAt ? format(new Date(pledge.createdAt), 'dd-MMM-yyyy') : '-'}
+                </span>
+              </div>
+               <div className="flex justify-between">
+    <span className="text-muted-foreground">Scheme Name:</span>
+
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="cursor-pointer text-primary underline underline-offset-2">
+            {pledge.schemeName}
+          </span>
+        </TooltipTrigger>
+
+        <TooltipContent className="p-3 w-56">
+          <div className="space-y-1">
+            <div className="font-semibold mb-2">Interest Tiers</div>
+
+            {scheme?.interestTiers?.length ? (
+              [...scheme.interestTiers]
+                .sort((a, b) => a.duration - b.duration)
+                .map((tier, index) => (
+                  <div
+                    key={index}
+                    className="flex justify-between text-sm"
+                  >
+                    <span>Month {tier.duration}</span>
+                    <span>{tier.rate}%</span>
+                  </div>
+                ))
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                No interest tiers configured
+              </div>
+            )}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  </div>
+  <div className="flex justify-between">
+    <span className="text-muted-foreground">
+      Current Interest:
+    </span>
+
+    <span className="font-semibold text-amber-600">
+      {rate}% P.M
+    </span>
+  </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Rate of Interest:</span>
+                <span className="font-medium">
+                  {pledge.interestTiers && pledge.interestTiers.length > 0 
+                    ? `${pledge.interestRate}% p.m. (Tiered)` 
+                    : `${pledge.interestRate}% p.m.`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Duration:</span>
+                <span className="font-medium">{durationText}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  Interest Accrued {selectedPaymentDate ? `(till ${format(selectedPaymentDate, 'MMM do')})` : ''}:
+                </span>
+                <span className="font-medium text-amber-500">
+                  ₹{Math.round(grossInterestAccrued).toLocaleString('en-IN')}
                 </span>
               </div>
 
-              {breakdown && breakdown.length > 0 ? (
-                <div className="mt-2 space-y-1 bg-amber-50/50 dark:bg-amber-950/10 p-2 rounded border border-amber-100 dark:border-amber-900/50">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
-                    Interest Breakdown (Month-wise):
+              <div className="pl-4 border-l-2 border-amber-200 dark:border-amber-900 space-y-1.5 py-0.5 my-1">
+                <div className="flex justify-between text-sm sm:text-base text-muted-foreground">
+                  <span>Total Months Passed:</span>
+                  <span className="font-medium">
+                    {lastPartialDateText 
+                      ? `${monthsPassed} months (since payment on ${lastPartialDateText})`
+                      : `${monthsPassed} months (${Math.max(0, monthsPassed - 1)} billable)`}
                   </span>
-                  {breakdown.map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-xs sm:text-sm text-muted-foreground pl-2 border-l border-amber-200 dark:border-amber-800">
-                      <span>
-                        Month {item.monthIndex}: {item.rate}% of ₹{item.principal.toLocaleString('en-IN')}
-                      </span>
+                </div>
+
+                {breakdown && breakdown.length > 0 ? (
+                  <div className="mt-2 space-y-1 bg-amber-50/50 dark:bg-amber-950/10 p-2 rounded border border-amber-100 dark:border-amber-900/50">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-1">
+                      Interest Breakdown (Month-wise):
+                    </span>
+                    {breakdown.map((item, idx) => (
+                      <div key={idx} className="flex justify-between text-xs sm:text-sm text-muted-foreground pl-2 border-l border-amber-200 dark:border-amber-800">
+                        <span>
+                          Month {item.monthIndex}: {item.rate}% of ₹{item.principal.toLocaleString('en-IN')}
+                        </span>
+                        <span className="font-medium">
+                          ₹{Math.round(item.interestAccrued).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between text-sm sm:text-base text-muted-foreground">
+                      <span>One Month Interest:</span>
+                      <span className="font-medium">₹{Math.round(outstandingPrincipal * (pledge.interestRate / 100)).toLocaleString('en-IN')}</span>
+                    </div>
+                    <div className="flex justify-between text-sm sm:text-base text-muted-foreground">
+                      <span>Calculation:</span>
                       <span className="font-medium">
-                        ₹{Math.round(item.interestAccrued).toLocaleString('en-IN')}
+                        {lastPartialDateText 
+                          ? `${monthsPassed} months × ₹${Math.round(outstandingPrincipal * (pledge.interestRate / 100)).toLocaleString('en-IN')} = ₹${Math.round(grossInterestAccrued).toLocaleString('en-IN')}`
+                          : `${Math.max(0, monthsPassed - 1)} months × ₹${Math.round(outstandingPrincipal * (pledge.interestRate / 100)).toLocaleString('en-IN')} = ₹${Math.round(grossInterestAccrued).toLocaleString('en-IN')}`}
                       </span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <div className="flex justify-between text-sm sm:text-base text-muted-foreground">
-                    <span>One Month Interest:</span>
-                    <span className="font-medium">₹{Math.round(outstandingPrincipal * (pledge.interestRate / 100)).toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="flex justify-between text-sm sm:text-base text-muted-foreground">
-                    <span>Calculation:</span>
-                    <span className="font-medium">
-                      {lastPartialDateText 
-                        ? `${monthsPassed} months × ₹${Math.round(outstandingPrincipal * (pledge.interestRate / 100)).toLocaleString('en-IN')} = ₹${Math.round(grossInterestAccrued).toLocaleString('en-IN')}`
-                        : `${Math.max(0, monthsPassed - 1)} months × ₹${Math.round(outstandingPrincipal * (pledge.interestRate / 100)).toLocaleString('en-IN')} = ₹${Math.round(grossInterestAccrued).toLocaleString('en-IN')}`}
-                    </span>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Interest Paid:</span>
-              <span className="font-medium text-green-500">
-                ₹{Math.round(interestPaid).toLocaleString('en-IN')}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Interest Due:</span>
-              <span className="font-medium text-destructive">
-                ₹{Math.round(currentInterestDue).toLocaleString('en-IN')}
-              </span>
-            </div>
-            <hr />
-            <div className="flex justify-between font-bold text-lg sm:text-xl pt-1">
-              <span>Total Due for Full Settlement:</span>
-              <span className="text-amber-500">₹{Math.round(totalDueForSettlement).toLocaleString('en-IN')}</span>
-            </div>
-          </CardContent>
-        </Card>
+                  </>
+                )}
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Interest Paid:</span>
+                <span className="font-medium text-green-500">
+                  ₹{Math.round(interestPaid).toLocaleString('en-IN')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Interest Due:</span>
+                <span className="font-medium text-destructive">
+                  ₹{Math.round(currentInterestDue).toLocaleString('en-IN')}
+                </span>
+              </div>
+              <hr />
+              <div className="flex justify-between font-bold text-lg sm:text-xl pt-1">
+                <span>Total Due for Full Settlement:</span>
+                <span className="text-amber-500">₹{Math.round(totalDueForSettlement).toLocaleString('en-IN')}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <RepledgeHistoryCard pledge={pledge} variant="compact" />
+        </div>
 
         <Card>
           <CardHeader>
