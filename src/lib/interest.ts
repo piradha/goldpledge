@@ -12,13 +12,8 @@ export interface InterestBreakdownItem {
  * Helper to calculate calendar months passed since the start date.
  * E.g., Oct 8 to Nov 8 is 1 month. Nov 9 enters Month 2, so 2 months passed.
  */
-function calculateCalendarMonthsPassed(
-  startDate: Date,
-  evaluationDate: Date
-): number {
-  if (evaluationDate <= startDate) {
-    return 0;
-  }
+function calculateCalendarMonthsPassed(startDate: Date, evaluationDate: Date): number {
+  if (evaluationDate <= startDate) return 0;
 
   const startYear = startDate.getFullYear();
   const startMonth = startDate.getMonth();
@@ -28,13 +23,10 @@ function calculateCalendarMonthsPassed(
   const evalMonth = evaluationDate.getMonth();
   const evalDay = evaluationDate.getDate();
 
-  let months =
-    (evalYear - startYear) * 12 +
-    (evalMonth - startMonth);
+  let months = (evalYear - startYear) * 12 + (evalMonth - startMonth);
 
-  // Only count a month after the anniversary day is reached.
-  if (evalDay < startDay) {
-    months -= 1;
+  if (evalDay > startDay) {
+    months += 1;
   }
 
   return Math.max(0, months);
@@ -125,7 +117,7 @@ export function getInterestRateForMonth(pledge: Pledge, monthIndex: number): num
  */
 export function calculateInterest(
   pledge: Pledge,
-  scheme: Scheme | null | undefined = null,
+  scheme: Scheme | null | undefined,
   evaluationDate: Date = new Date(),
   payments: Payment[] = []
 ): { interestDue: number; monthsPassed: number; breakdown: InterestBreakdownItem[], rate: number } {
@@ -138,8 +130,6 @@ export function calculateInterest(
 
   const evaluation = new Date(evaluationDate);
   evaluation.setHours(0, 0, 0, 0);
-
-  const isAdvanceInterest = scheme?.advanceInterest ?? pledge.advanceInterest ?? false;
 
   // Filter and sort partial payments
   const partialPayments = payments
@@ -173,16 +163,18 @@ export function calculateInterest(
     const startMonthIndex = Math.max(1, totalMonthsPassed - monthsPassedSincePayment + 1);
     const breakdown: InterestBreakdownItem[] = [];
 
+    const currentRate = getApplicableInterestRate(pledge, scheme || null || undefined, totalMonthsPassed);
+
     for (let m = startMonthIndex; m <= totalMonthsPassed; m++) {
-      const monthRate = getApplicableInterestRate(pledge, scheme ?? undefined, m);
+
       const monthlyInterest =
-        outstandingPrincipal * (monthRate / 100);
+        outstandingPrincipal * (currentRate / 100);
 
       interestAccruedSincePayment += monthlyInterest;
 
       breakdown.push({
         monthIndex: m,
-        rate: monthRate,
+        rate: currentRate,
         principal: outstandingPrincipal,
         interestAccrued: monthlyInterest
       });
@@ -194,55 +186,41 @@ export function calculateInterest(
       interestDue: Math.max(0, totalInterest),
       monthsPassed: monthsPassedSincePayment,
       breakdown,
-      rate: breakdown.length > 0 ? breakdown[breakdown.length - 1].rate : getApplicableInterestRate(pledge, scheme ?? undefined, totalMonthsPassed)
+      rate: currentRate
     };
   }
 
   // Fallback to original calculation when there are no partial payments
   const monthsPassed = calculateCalendarMonthsPassed(startDate, evaluation);
-  const billableMonths = isAdvanceInterest ? Math.max(0, monthsPassed - 1) : monthsPassed;
+  const billableMonths = Math.max(0, monthsPassed - 1);
 
   if (billableMonths === 0) {
-    return {
-      interestDue: 0,
-      monthsPassed,
-      breakdown: [],
-      rate: getApplicableInterestRate(pledge, scheme ?? undefined, Math.max(1, monthsPassed))
-    };
+    return { interestDue: 0, monthsPassed, breakdown: [], rate: 0 };
   }
 
   const outstandingPrincipal = pledge.loanAmount - pledge.paidAmount;
-
   let totalInterest = 0;
   const breakdown: InterestBreakdownItem[] = [];
-  const startMonth = isAdvanceInterest ? 2 : 1;
+  const currentRate = getApplicableInterestRate(pledge, scheme || null || undefined, monthsPassed);
 
-  for (let m = startMonth; m <= monthsPassed; m++) {
-    const monthRate = getApplicableInterestRate(
-      pledge,
-      scheme ?? undefined,
-      m
-    );
+  for (let m = 2; m <= monthsPassed; m++) {
 
     const monthlyInterest =
-      outstandingPrincipal * (monthRate / 100);
+      outstandingPrincipal * (currentRate / 100);
 
     totalInterest += monthlyInterest;
 
     breakdown.push({
       monthIndex: m,
-      rate: monthRate,
+      rate: currentRate,
       principal: outstandingPrincipal,
       interestAccrued: monthlyInterest
     });
   }
-
   return {
     interestDue: Math.max(0, totalInterest),
     monthsPassed,
     breakdown,
-    rate: breakdown.length > 0
-      ? breakdown[breakdown.length - 1].rate
-      : getApplicableInterestRate(pledge, scheme ?? undefined, monthsPassed)
+    rate: currentRate
   };
 }
