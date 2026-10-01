@@ -23,10 +23,13 @@ function calculateCalendarMonthsPassed(startDate: Date, evaluationDate: Date): n
   const evalMonth = evaluationDate.getMonth();
   const evalDay = evaluationDate.getDate();
 
-  let months = (evalYear - startYear) * 12 + (evalMonth - startMonth);
+  let months =
+    (evalYear - startYear) * 12 +
+    (evalMonth - startMonth);
 
-  if (evalDay > startDay) {
-    months += 1;
+  // Count only fully completed calendar months.
+  if (evalDay < startDay) {
+    months -= 1;
   }
 
   return Math.max(0, months);
