@@ -27,7 +27,11 @@ export function OverdueReport() {
     // OR checking dueDate relative to today.
     // Let's fetch all Non-closed and check dates for accuracy.
     const pledgesQuery = useMemoFirebase(
-        () => (firestore && userProfile ? query(collection(firestore, 'pledges'), where('shopId', '==', userProfile.shopId)) : null),
+        () => (firestore && userProfile ? query(
+            collection(firestore, 'pledges'),
+            where('shopId', '==', userProfile.shopId),
+            where('status', 'in', ['ACTIVE', 'OVERDUE'])
+        ) : null),
         [firestore, userProfile]
     );
     const { data: pledges, isLoading } = useCollection<Pledge>(pledgesQuery);

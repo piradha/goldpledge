@@ -19,24 +19,20 @@ export function ActiveInventoryReport() {
     const { data: userProfiles } = useCollection<UserProfile>(userProfileQuery);
     const userProfile = useMemo(() => (userProfiles && userProfiles[0]) ? userProfiles[0] : null, [userProfiles]);
 
-    const activePledgesQuery = useMemoFirebase(
-        () => (firestore && userProfile ? query(collection(firestore, 'pledges'), where('shopId', '==', userProfile.shopId), where('status', '==', 'ACTIVE')) : null),
-        [firestore, userProfile]
-    );
-    // Note: We might also want to include 'OVERDUE' in active inventory as we still hold the stock.
-    const overduePledgesQuery = useMemoFirebase(
-        () => (firestore && userProfile ? query(collection(firestore, 'pledges'), where('shopId', '==', userProfile.shopId), where('status', '==', 'OVERDUE')) : null),
+    const inventoryQuery = useMemoFirebase(
+        () => (firestore && userProfile ? query(
+            collection(firestore, 'pledges'),
+            where('shopId', '==', userProfile.shopId),
+            where('status', 'in', ['ACTIVE', 'OVERDUE'])
+        ) : null),
         [firestore, userProfile]
     );
 
-    const { data: activePledges, isLoading: isLoadingActive } = useCollection<Pledge>(activePledgesQuery);
-    const { data: overduePledges, isLoading: isLoadingOverdue } = useCollection<Pledge>(overduePledgesQuery);
+    const { data: pledges, isLoading: isLoadingInventory } = useCollection<Pledge>(inventoryQuery);
 
     const allInventory = useMemo(() => {
-        const active = activePledges || [];
-        const overdue = overduePledges || [];
-        return [...active, ...overdue].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    }, [activePledges, overduePledges]);
+        return (pledges || []).slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }, [pledges]);
 
     const summary = useMemo(() => {
         return allInventory.reduce((acc, pledge) => {
@@ -53,7 +49,7 @@ export function ActiveInventoryReport() {
         }, { totalCount: 0, totalLoanAmount: 0, goldWeight: 0, silverWeight: 0 });
     }, [allInventory]);
 
-    const isLoading = isLoadingActive || isLoadingOverdue;
+    const isLoading = isLoadingInventory;
 
     return (
         <Card>

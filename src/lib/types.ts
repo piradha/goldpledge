@@ -66,6 +66,7 @@ export type Pledge = {
     customerName: string; // Denormalized
     schemeId?: string;
     schemeName?: string;
+    advanceInterest?: boolean;
     interestTiers?: InterestTier[];
     overdueInterestRate?: number;
     items: PledgeItem[];

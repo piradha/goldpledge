@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Pledge, Payment, Shop } from '@/lib/types';
+import { Pledge, Payment, Shop, Scheme } from '@/lib/types';
 import { collection, Firestore, doc, runTransaction, getDocs, writeBatch, query, where, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { calculateInterest } from '@/lib/interest';
 import { errorEmitter } from '../error-emitter';
@@ -227,7 +227,16 @@ export async function releasePledge(firestore: Firestore, pledgeId: string) {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(d => d.data() as Payment);
 
-        const { interestDue } = calculateInterest(pledge, null, new Date(), payments);
+        let scheme: Scheme | null = null;
+        if (pledge.schemeId) {
+            const schemeRef = doc(firestore, 'schemes', pledge.schemeId);
+            const schemeDoc = await transaction.get(schemeRef);
+            if (schemeDoc.exists()) {
+                scheme = { ...schemeDoc.data(), id: schemeDoc.id } as Scheme;
+            }
+        }
+
+        const { interestDue } = calculateInterest(pledge, scheme, new Date(), payments);
         const outstandingPrincipal = (Number(pledge.loanAmount) || 0) - (Number(pledge.paidAmount) || 0);
         const totalOutstanding = outstandingPrincipal + interestDue;
 

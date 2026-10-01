@@ -3,7 +3,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useDoc, useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
-import { Customer, Pledge, UserProfile } from '@/lib/types';
+import { Customer, Pledge, UserProfile, Scheme } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { doc, collection, query, where } from 'firebase/firestore';
@@ -88,6 +88,12 @@ export default function CustomerDetailPage() {
         [firestore, customerId]
     );
     const { data: pledges, isLoading: isLoadingPledges } = useCollection<Pledge>(customerPledgesQuery);
+
+    const schemesQuery = useMemoFirebase(
+        () => (firestore && userProfile?.shopId ? query(collection(firestore, 'schemes'), where('shopId', '==', userProfile.shopId)) : null),
+        [firestore, userProfile?.shopId]
+    );
+    const { data: schemes } = useCollection<Scheme>(schemesQuery);
 
     const isLoading = isLoadingCustomer || isLoadingPledges || isLoadingProfile;
 
@@ -221,7 +227,8 @@ export default function CustomerDetailPage() {
                                 <TableBody>
                                     {pledges && pledges.length > 0 ? (
                                         pledges.map(pledge => {
-                                            const { interestDue } = calculateInterest(pledge);
+                                            const scheme = schemes?.find(s => s.id === pledge.schemeId);
+                                            const { interestDue } = calculateInterest(pledge, scheme);
                                             const outstandingPrincipal = pledge.loanAmount - pledge.paidAmount;
                                             const totalOutstanding = outstandingPrincipal + interestDue;
                                             return (

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BankPledgeGroup, Pledge, UserProfile } from "@/lib/types";
+import { BankPledgeGroup, Pledge, UserProfile, Scheme } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Search, PlusCircle, Building2, Calendar, FileCheck, CheckCircle2, XCircle, MoreHorizontal } from "lucide-react";
 import React, { useMemo, useState } from "react";
@@ -65,6 +65,12 @@ export default function BankPledgesList() {
         [firestore, userProfile]
     );
     const { data: bankPledges, isLoading: isLoadingPledges } = useCollection<Pledge>(bankPledgesQuery);
+
+    const schemesQuery = useMemoFirebase(
+        () => (firestore && userProfile ? query(collection(firestore, 'schemes'), where('shopId', '==', userProfile.shopId)) : null),
+        [firestore, userProfile]
+    );
+    const { data: schemes } = useCollection<Scheme>(schemesQuery);
 
     const activeGroups = useMemo(() => {
         if (!groups) return [];
@@ -162,7 +168,7 @@ export default function BankPledgesList() {
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-muted-foreground text-xs uppercase">Interest Due</p>
-                                        <p className="font-semibold text-rose-500">₹{calculateInterest(foundPledge).interestDue.toFixed(2)}</p>
+                                        <p className="font-semibold text-rose-500">₹{calculateInterest(foundPledge, schemes?.find(s => s.id === foundPledge.schemeId)).interestDue.toFixed(2)}</p>
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-muted-foreground text-xs uppercase">Closing Date</p>
@@ -386,7 +392,7 @@ export default function BankPledgesList() {
                                                                                                     <span className="text-[9px] text-muted-foreground">{p.schemeName || "General"} ({p.interestRate}%)</span>
                                                                                                 </div>
                                                                                                 <div className="text-[9px] text-rose-500 font-medium">
-                                                                                                    Int: ₹{calculateInterest(p).interestDue.toFixed(2)}
+                                                                                                    Int: ₹{calculateInterest(p, schemes?.find(s => s.id === p.schemeId)).interestDue.toFixed(2)}
                                                                                                 </div>
                                                                                                 <div className="text-[8px] text-muted-foreground">
                                                                                                     Since: {format(new Date(p.createdAt), "dd/MM/yy")}

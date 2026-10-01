@@ -1,7 +1,7 @@
 
 "use client";
 import React from 'react';
-import { Pledge, Customer, Shop, Payment } from '@/lib/types';
+import { Pledge, Customer, Shop, Payment, Scheme } from '@/lib/types';
 import { calculateInterest } from '@/lib/interest';
 import Image from 'next/image';
 
@@ -10,6 +10,7 @@ interface PaymentReceiptProps {
     pledge: Pledge;
     customer: Customer;
     shop: Shop;
+    scheme?: Scheme | null;
     allPayments?: Payment[];
 }
 
@@ -23,13 +24,13 @@ const formatIndianCurrency = (num: number) => {
 };
 
 export const PaymentReceipt = React.forwardRef<HTMLDivElement, PaymentReceiptProps>((props, ref) => {
-    const { payment, pledge, customer, shop, allPayments } = props;
+    const { payment, pledge, customer, shop, scheme, allPayments } = props;
 
     if (!payment || !pledge || !customer || !shop) {
         return <div ref={ref} className="p-8 text-center text-red-500">Missing data to generate receipt.</div>;
     }
 
-    const { interestDue: interestAfterPayment } = calculateInterest(pledge, null, new Date(payment.paymentDate), allPayments || []);
+    const { interestDue: interestAfterPayment } = calculateInterest(pledge, scheme || null, new Date(payment.paymentDate), allPayments || []);
     const outstandingPrincipalAfterPayment = (Number(pledge.loanAmount) || 0) - (Number(pledge.paidAmount) || 0);
     const totalOutstandingAfterPayment = outstandingPrincipalAfterPayment + interestAfterPayment;
 

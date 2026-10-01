@@ -38,20 +38,35 @@ export function DailyTransactionReport() {
     const { data: userProfiles } = useCollection<UserProfile>(userProfileQuery);
     const userProfile = useMemo(() => (userProfiles && userProfiles[0]) ? userProfiles[0] : null, [userProfiles]);
 
+    const { startIso, endIso } = useMemo(() => {
+        const start = new Date(date);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(date);
+        end.setHours(23, 59, 59, 999);
+        return { startIso: start.toISOString(), endIso: end.toISOString() };
+    }, [date]);
+
     // 2. Fetch Pledges (New Loans) for the selected date
-    // Note: This is an approximation. Ideally we filter by date range in query, 
-    // but for simplicity/small data we can fetch recent and filter client side or do exact date query if high volume.
-    // Let's do client side filtering for now as data volume is likely low.
     const pledgesQuery = useMemoFirebase(
-        () => (firestore && userProfile ? query(collection(firestore, 'pledges'), where('shopId', '==', userProfile.shopId)) : null),
-        [firestore, userProfile]
+        () => (firestore && userProfile ? query(
+            collection(firestore, 'pledges'),
+            where('shopId', '==', userProfile.shopId),
+            where('createdAt', '>=', startIso),
+            where('createdAt', '<=', endIso)
+        ) : null),
+        [firestore, userProfile, startIso, endIso]
     );
     const { data: pledges, isLoading: isLoadingPledges } = useCollection<Pledge>(pledgesQuery);
 
     // 3. Fetch Payments
     const paymentsQuery = useMemoFirebase(
-        () => (firestore && userProfile ? query(collection(firestore, 'payments'), where('shopId', '==', userProfile.shopId)) : null),
-        [firestore, userProfile]
+        () => (firestore && userProfile ? query(
+            collection(firestore, 'payments'),
+            where('shopId', '==', userProfile.shopId),
+            where('paymentDate', '>=', startIso),
+            where('paymentDate', '<=', endIso)
+        ) : null),
+        [firestore, userProfile, startIso, endIso]
     );
     const { data: payments, isLoading: isLoadingPayments } = useCollection<Payment>(paymentsQuery);
 

@@ -605,6 +605,7 @@ export function CreatePledgeForm({ editId }: { editId?: string }) {
             customerId: values.customerId,
             schemeId: values.schemeId || '',
             schemeName: selectedScheme?.name || '',
+            advanceInterest: selectedScheme ? (selectedScheme.advanceInterest ?? false) : (sourcePledge?.advanceInterest || editPledge?.advanceInterest || false),
             interestTiers: selectedScheme ? (selectedScheme.interestTiers || []) : (sourcePledge?.interestTiers || editPledge?.interestTiers || []),
             overdueInterestRate: selectedScheme ? (selectedScheme.overdueInterestRate || 0) : (sourcePledge?.overdueInterestRate || editPledge?.overdueInterestRate || 0),
             items: pledgeItems,

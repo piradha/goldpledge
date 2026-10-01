@@ -21,15 +21,52 @@ export function CashFlowReport() {
     const { data: userProfiles } = useCollection<UserProfile>(userProfileQuery);
     const userProfile = useMemo(() => (userProfiles && userProfiles[0]) ? userProfiles[0] : null, [userProfiles]);
 
+    const startIso = useMemo(() => {
+        const startOfRange = new Date();
+        if (timeRange === 'today') {
+            startOfRange.setHours(0, 0, 0, 0);
+            return startOfRange.toISOString();
+        } else if (timeRange === 'thisMonth') {
+            startOfRange.setDate(1);
+            startOfRange.setHours(0, 0, 0, 0);
+            return startOfRange.toISOString();
+        } else if (timeRange === 'thisYear') {
+            startOfRange.setMonth(0, 1);
+            startOfRange.setHours(0, 0, 0, 0);
+            return startOfRange.toISOString();
+        }
+        return null;
+    }, [timeRange]);
+
     const pledgesQuery = useMemoFirebase(
-        () => (firestore && userProfile ? query(collection(firestore, 'pledges'), where('shopId', '==', userProfile.shopId)) : null),
-        [firestore, userProfile]
+        () => {
+            if (!firestore || !userProfile) return null;
+            if (startIso) {
+                return query(
+                    collection(firestore, 'pledges'),
+                    where('shopId', '==', userProfile.shopId),
+                    where('createdAt', '>=', startIso)
+                );
+            }
+            return query(collection(firestore, 'pledges'), where('shopId', '==', userProfile.shopId));
+        },
+        [firestore, userProfile, startIso]
     );
     const { data: pledges, isLoading: isLoadingPledges } = useCollection<Pledge>(pledgesQuery);
 
     const paymentsQuery = useMemoFirebase(
-        () => (firestore && userProfile ? query(collection(firestore, 'payments'), where('shopId', '==', userProfile.shopId)) : null),
-        [firestore, userProfile]
+        () => {
+            if (!firestore || !userProfile) return null;
+            if (startIso) {
+                return query(
+                    collection(firestore, 'payments'),
+                    where('shopId', '==', userProfile.shopId),
+                    where('paymentDate', '>=', startIso)
+                );
+            }
+            return query(collection(firestore, 'payments'), where('shopId', '==', userProfile.shopId));
+        },
+        [firestore, userProfile, startIso]
     );
     const { data: payments, isLoading: isLoadingPayments } = useCollection<Payment>(paymentsQuery);
 

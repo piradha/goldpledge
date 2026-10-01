@@ -45,9 +45,19 @@ export default function DashboardPage() {
   
   const { data: pledges, isLoading: isLoadingPledges } = useCollection<Pledge>(shopPledgesQuery);
 
+  const todayStartIso = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.toISOString();
+  }, []);
+
   const shopPaymentsQuery = useMemoFirebase(
-    () => (firestore && userProfile ? query(collection(firestore, 'payments'), where('shopId', '==', userProfile.shopId)) : null),
-    [firestore, userProfile]
+    () => (firestore && userProfile ? query(
+      collection(firestore, 'payments'),
+      where('shopId', '==', userProfile.shopId),
+      where('paymentDate', '>=', todayStartIso)
+    ) : null),
+    [firestore, userProfile, todayStartIso]
   );
   const { data: payments, isLoading: isLoadingPayments } = useCollection<Payment>(shopPaymentsQuery);
 
@@ -77,19 +87,7 @@ export default function DashboardPage() {
 
   const todaysIncome = useMemo(() => {
     if (!payments) return 0;
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1); // Start of tomorrow
-
-    return payments.reduce((sum, payment) => {
-        const paymentDate = new Date(payment.paymentDate);
-        if (paymentDate >= today && paymentDate < tomorrow) {
-            return sum + (Number(payment.amount) || 0);
-        }
-        return sum;
-    }, 0);
+    return payments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0);
   }, [payments]);
 
   return (

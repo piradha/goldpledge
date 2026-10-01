@@ -126,7 +126,7 @@ export default function MakePaymentPage() {
   const adjustment = form.watch('adjustment');
   const selectedPaymentDate = form.watch('paymentDate');
   
-  const { grossInterestAccrued, currentInterestDue, totalDueForSettlement, outstandingPrincipal, interestPaid, monthsPassed, durationText, lastPartialDateText, breakdown,rate } = useMemo(() => {
+  const { grossInterestAccrued, currentInterestDue, totalDueForSettlement, outstandingPrincipal, interestPaid, monthsPassed, durationText, lastPartialDateText, breakdown, rate, isAdvanceInterest } = useMemo(() => {
     if (!pledge) return { 
       grossInterestAccrued: 0, 
       currentInterestDue: 0, 
@@ -136,7 +136,9 @@ export default function MakePaymentPage() {
       monthsPassed: 0,
       durationText: '',
       lastPartialDateText: null,
-      breakdown: []
+      breakdown: [],
+      rate: 0,
+      isAdvanceInterest: false
     };
 
     const { interestDue: gross, monthsPassed, breakdown,rate } = calculateInterest(pledge,scheme, selectedPaymentDate || new Date(), payments || []);
@@ -182,6 +184,8 @@ export default function MakePaymentPage() {
     const lastPartial = partialPaymentsList[partialPaymentsList.length - 1];
     const lastPartialDateText = lastPartial ? format(new Date(lastPartial.paymentDate), 'dd-MMM-yyyy') : null;
 
+    const isAdvanceInterest = scheme?.advanceInterest ?? pledge.advanceInterest ?? false;
+
     return {
       grossInterestAccrued: gross,
       currentInterestDue: due,
@@ -192,7 +196,8 @@ export default function MakePaymentPage() {
       durationText,
       lastPartialDateText,
       breakdown,
-      rate
+      rate,
+      isAdvanceInterest
     };
   }, [pledge,scheme, selectedPaymentDate, payments]);
 
@@ -446,7 +451,9 @@ export default function MakePaymentPage() {
                   <span className="font-medium">
                     {lastPartialDateText 
                       ? `${monthsPassed} months (since payment on ${lastPartialDateText})`
-                      : `${monthsPassed} months (${Math.max(0, monthsPassed - 1)} billable)`}
+                      : isAdvanceInterest
+                        ? `${monthsPassed} months (${Math.max(0, monthsPassed - 1)} billable)`
+                        : `${monthsPassed} months (${monthsPassed} billable)`}
                   </span>
                 </div>
 

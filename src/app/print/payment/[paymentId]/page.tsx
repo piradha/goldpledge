@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { useDoc, useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { doc, query, collection, where } from 'firebase/firestore';
-import { Customer, Pledge, Shop, Payment } from '@/lib/types';
+import { Customer, Pledge, Shop, Payment, Scheme } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PaymentReceipt } from '@/app/(app)/pledges/payment-receipt';
 
@@ -34,6 +34,12 @@ export default function PrintPledgePage() {
         [firestore, payment]
     );
     const { data: pledge, isLoading: isLoadingPledge } = useDoc<Pledge>(pledgeRef);
+
+    const schemeRef = useMemoFirebase(
+        () => (firestore && pledge?.schemeId ? doc(firestore, 'schemes', pledge.schemeId) : null),
+        [firestore, pledge?.schemeId]
+    );
+    const { data: scheme } = useDoc<Scheme>(schemeRef);
 
     const customerRef = useMemoFirebase(
         () => (firestore && pledge ? doc(firestore, 'customers', pledge.customerId) : null),
@@ -68,7 +74,7 @@ export default function PrintPledgePage() {
     }
     
     return (
-         <PaymentReceipt payment={payment} pledge={pledge} customer={customer} shop={shop} allPayments={allPayments || []} />
+         <PaymentReceipt payment={payment} pledge={pledge} customer={customer} shop={shop} scheme={scheme} allPayments={allPayments || []} />
     );
 }
 
