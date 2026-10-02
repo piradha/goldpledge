@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DashboardCharts } from "./dashboard-charts";
 import { useCollection, useDoc, useFirebase, useMemoFirebase, useUser } from "@/firebase";
 import { Pledge, UserProfile, Payment } from "@/lib/types";
-import { collection, doc, query, where } from "firebase/firestore";
+import { Timestamp, collection, doc, query, where } from "firebase/firestore";
 import { Banknote, BookHeart, CalendarClock, Scale, TrendingDown, TrendingUp } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMemo } from "react";
@@ -42,22 +42,28 @@ export default function DashboardPage() {
     () => (firestore && userProfile ? query(collection(firestore, 'pledges'), where('shopId', '==', userProfile.shopId)) : null),
     [firestore, userProfile]
   );
-  
+
   const { data: pledges, isLoading: isLoadingPledges } = useCollection<Pledge>(shopPledgesQuery);
 
-  const todayStartIso = useMemo(() => {
+  // 1. Create a Firestore Timestamp for midnight today
+  const todayStartTimestamp = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return today.toISOString();
+    return Timestamp.fromDate(today);
   }, []);
 
+  // 2. Ensure shopId is present before running the payments query
   const shopPaymentsQuery = useMemoFirebase(
-    () => (firestore && userProfile ? query(
-      collection(firestore, 'payments'),
-      where('shopId', '==', userProfile.shopId),
-      where('paymentDate', '>=', todayStartIso)
-    ) : null),
-    [firestore, userProfile, todayStartIso]
+    () => (
+      firestore && userProfile?.shopId
+        ? query(
+          collection(firestore, 'payments'),
+          where('shopId', '==', userProfile.shopId),
+          where('paymentDate', '>=', todayStartTimestamp)
+        )
+        : null
+    ),
+    [firestore, userProfile?.shopId, todayStartTimestamp]
   );
   const { data: payments, isLoading: isLoadingPayments } = useCollection<Payment>(shopPaymentsQuery);
 
@@ -65,7 +71,7 @@ export default function DashboardPage() {
 
   const activePledges = pledges?.filter(p => p.status === 'ACTIVE' || p.status === 'OVERDUE') || [];
   const totalLoanAmount = activePledges.reduce((sum, p) => sum + Number(p.loanAmount), 0);
-  
+
   const { totalGoldWeight, totalSilverWeight } = useMemo(() => {
     return activePledges.reduce(
       (acc, pledge) => {
