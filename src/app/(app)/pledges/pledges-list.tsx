@@ -358,14 +358,12 @@ export default function PledgesList() {
             return searchMatch && statusMatch && metalTypeMatch && startDateMatch && endDateMatch;
 
         }).sort((a, b) => {
-            const dateA = new Date(a.createdAt).getTime();
-            const dateB = new Date(b.createdAt).getTime();
-            if (!isNaN(dateA) && !isNaN(dateB) && dateB !== dateA) {
-                return dateB - dateA;
-            }
             const numA = parseInt(a.id.split('-').pop() || '0', 10);
             const numB = parseInt(b.id.split('-').pop() || '0', 10);
-            return numB - numA;
+            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+                return numB - numA;
+            }
+            return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
         });
 
         // In fallback mode, when dataLimit is set and no search or date filter is active, cap to dataLimit latest records

@@ -92,14 +92,12 @@ export default function CustomerDetailPage() {
     const sortedPledges = useMemo(() => {
         if (!pledges) return [];
         return [...pledges].sort((a, b) => {
-            const dateA = new Date(a.createdAt).getTime();
-            const dateB = new Date(b.createdAt).getTime();
-            if (!isNaN(dateA) && !isNaN(dateB) && dateB !== dateA) {
-                return dateB - dateA;
-            }
             const numA = parseInt(a.id.split('-').pop() || '0', 10);
             const numB = parseInt(b.id.split('-').pop() || '0', 10);
-            return numB - numA;
+            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+                return numB - numA;
+            }
+            return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
         });
     }, [pledges]);
 

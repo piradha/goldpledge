@@ -31,7 +31,14 @@ export function ActiveInventoryReport() {
     const { data: pledges, isLoading: isLoadingInventory } = useCollection<Pledge>(inventoryQuery);
 
     const allInventory = useMemo(() => {
-        return (pledges || []).slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        return (pledges || []).slice().sort((a, b) => {
+            const numA = parseInt(a.id.split('-').pop() || '0', 10);
+            const numB = parseInt(b.id.split('-').pop() || '0', 10);
+            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+                return numB - numA;
+            }
+            return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
+        });
     }, [pledges]);
 
     const summary = useMemo(() => {
