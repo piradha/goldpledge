@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCollection, useDoc, useFirebase, useMemoFirebase, useUser } from "@/firebase";
-import { MoreHorizontal, PlusCircle } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Search, X } from "lucide-react";
 import { collection, query, where, doc } from "firebase/firestore";
 import { Scheme, UserProfile } from "@/lib/types";
 import { AddSchemeDialog } from "./add-scheme-dialog";
@@ -22,6 +22,7 @@ import { DeleteSchemeDialog } from "./delete-scheme-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { EditSchemeDialog } from "./edit-scheme-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { useMemo, useState } from "react";
 
 function SchemeRowSkeleton() {
@@ -42,6 +43,7 @@ export default function SchemesPage() {
   const { firestore } = useFirebase();
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
   const [schemeToEdit, setSchemeToEdit] = useState<Scheme | null>(null);
 
   const userProfileQuery = useMemoFirebase(
@@ -56,6 +58,15 @@ export default function SchemesPage() {
     [firestore, userProfile]
   );
   const { data: schemes, isLoading: isLoadingSchemes } = useCollection<Scheme>(schemesQuery);
+
+  const filteredSchemes = useMemo(() => {
+    if (!schemes) return [];
+    if (!searchTerm.trim()) return schemes;
+    const term = searchTerm.trim().toLowerCase();
+    return schemes.filter((scheme) =>
+      scheme.name?.toLowerCase().includes(term)
+    );
+  }, [schemes, searchTerm]);
 
   const handleAddScheme = async (newScheme: Omit<Scheme, "id" | "shopId">) => {
     if (!firestore || !userProfile) {
@@ -112,14 +123,37 @@ export default function SchemesPage() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center gap-4">
+      <CardHeader className="flex flex-col md:flex-row items-center gap-4">
         <CardTitle className="flex-1">Schemes</CardTitle>
-        <AddSchemeDialog onAddScheme={handleAddScheme} disabled={isLoading}>
-          <Button size="sm" className="gap-2" disabled={isLoading}>
-            <PlusCircle className="h-4 w-4" />
-            Add Scheme
-          </Button>
-        </AddSchemeDialog>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by scheme name..."
+              className="pl-9 pr-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="icon"
+                type="button"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground hover:text-foreground"
+                onClick={() => setSearchTerm("")}
+              >
+                <X className="h-3.5 w-3.5" />
+                <span className="sr-only">Clear search</span>
+              </Button>
+            )}
+          </div>
+          <AddSchemeDialog onAddScheme={handleAddScheme} disabled={isLoading}>
+            <Button size="sm" className="gap-2 whitespace-nowrap" disabled={isLoading}>
+              <PlusCircle className="h-4 w-4" />
+              Add Scheme
+            </Button>
+          </AddSchemeDialog>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
@@ -138,7 +172,7 @@ export default function SchemesPage() {
           </TableHeader>
           <TableBody>
             {isLoading && Array.from({ length: 3 }).map((_, i) => <SchemeRowSkeleton key={i} />)}
-            {!isLoading && schemes?.map((scheme) => (
+            {!isLoading && filteredSchemes.map((scheme) => (
               <TableRow key={scheme.id}>
                 <TableCell className="font-medium">{scheme.name}</TableCell>
                 <TableCell>
@@ -184,6 +218,11 @@ export default function SchemesPage() {
             ))}
           </TableBody>
         </Table>
+        {!isLoading && schemes && schemes.length > 0 && filteredSchemes.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            No schemes found matching &quot;{searchTerm}&quot;.
+          </div>
+        )}
         {!isLoading && !schemes?.length && (
           <div className="text-center py-12 text-muted-foreground">
             No schemes created yet.

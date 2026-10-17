@@ -89,6 +89,20 @@ export default function CustomerDetailPage() {
     );
     const { data: pledges, isLoading: isLoadingPledges } = useCollection<Pledge>(customerPledgesQuery);
 
+    const sortedPledges = useMemo(() => {
+        if (!pledges) return [];
+        return [...pledges].sort((a, b) => {
+            const dateA = new Date(a.createdAt).getTime();
+            const dateB = new Date(b.createdAt).getTime();
+            if (!isNaN(dateA) && !isNaN(dateB) && dateB !== dateA) {
+                return dateB - dateA;
+            }
+            const numA = parseInt(a.id.split('-').pop() || '0', 10);
+            const numB = parseInt(b.id.split('-').pop() || '0', 10);
+            return numB - numA;
+        });
+    }, [pledges]);
+
     const schemesQuery = useMemoFirebase(
         () => (firestore && userProfile?.shopId ? query(collection(firestore, 'schemes'), where('shopId', '==', userProfile.shopId)) : null),
         [firestore, userProfile?.shopId]
@@ -225,8 +239,8 @@ export default function CustomerDetailPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {pledges && pledges.length > 0 ? (
-                                        pledges.map(pledge => {
+                                    {sortedPledges && sortedPledges.length > 0 ? (
+                                        sortedPledges.map(pledge => {
                                             const scheme = schemes?.find(s => s.id === pledge.schemeId);
                                             const { interestDue } = calculateInterest(pledge, scheme);
                                             const outstandingPrincipal = pledge.loanAmount - pledge.paidAmount;
