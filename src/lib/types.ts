@@ -61,6 +61,7 @@ export type bankCoverage = {
 
 export type Pledge = {
     id: string;
+    pledgeNo?: number; // Numeric sequence number for reliable descending sort (e.g. 2460)
     shopId: string;
     customerId: string;
     customerName: string; // Denormalized

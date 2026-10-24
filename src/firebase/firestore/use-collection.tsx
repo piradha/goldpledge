@@ -104,8 +104,11 @@ export function useCollection<T = any>(
           console.warn("Firestore onSnapshot non-permission error:", error);
           setError(error);
         }
-        setData(null)
-        setIsLoading(false)
+        // Do not clear data on quota exhaustion so cached offline documents remain visible
+        if (error.code !== 'resource-exhausted') {
+          setData(null);
+        }
+        setIsLoading(false);
       }
     );
 

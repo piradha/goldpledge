@@ -8,7 +8,7 @@ import { errorEmitter } from '../error-emitter';
 import { FirestorePermissionError } from '../errors';
 
 // Function to get the next sequential ID for pledges for a specific shop
-async function getNextPledgeId(firestore: Firestore, shop: Shop): Promise<string> {
+async function getNextPledgeId(firestore: Firestore, shop: Shop): Promise<{ pledgeId: string; pledgeNo: number }> {
     const counterRef = doc(firestore, 'counters', `pledge_${shop.id}`);
 
     try {
@@ -28,7 +28,10 @@ async function getNextPledgeId(firestore: Firestore, shop: Shop): Promise<string
         // Use the custom prefix if it exists, otherwise fall back to the first 3 chars of the shop name.
         const prefix = shop.prefix ? shop.prefix.toUpperCase() : shop.name.substring(0, 3).toUpperCase();
 
-        return `${prefix}-${newId}`;
+        return {
+            pledgeId: `${prefix}-${newId}`,
+            pledgeNo: newId,
+        };
     } catch (error) {
         console.error("Transaction to get next pledge ID failed: ", error);
         throw new Error("Could not generate a new Pledge ID.");
@@ -50,7 +53,7 @@ export async function addPledge(firestore: Firestore, pledgeData: Omit<Pledge, '
 
     const shop = { ...shopDoc.data(), id: shopDoc.id } as Shop;
 
-    const newPledgeId = await getNextPledgeId(firestore, shop);
+    const { pledgeId: newPledgeId, pledgeNo } = await getNextPledgeId(firestore, shop);
     const newPledgeRef = doc(firestore, 'pledges', newPledgeId);
 
     const sanitizedPledge: any = {};
@@ -63,6 +66,7 @@ export async function addPledge(firestore: Firestore, pledgeData: Omit<Pledge, '
     const newPledge: Pledge = {
         ...sanitizedPledge,
         id: newPledgeId,
+        pledgeNo,
         status: 'ACTIVE',
         paidAmount: 0,
         interestPaid: 0,
@@ -283,3 +287,44 @@ export async function updatePledge(firestore: Firestore, pledgeId: string, pledg
         throw error;
     });
 }
+
+/**
+ * Backfills numeric `pledgeNo` on any existing pledge documents for a shop that don't have it yet.
+ * Runs in batches of 400 to stay well within Firestore batch limits.
+ */
+export async function backfillPledgeNumbers(
+    firestore: Firestore,
+    shopId: string,
+    onProgress?: (processed: number, total: number) => void
+): Promise<{ updated: number; total: number }> {
+    const q = query(collection(firestore, 'pledges'), where('shopId', '==', shopId));
+    const snap = await getDocs(q);
+
+    let updated = 0;
+    const docsToUpdate = snap.docs.filter(d => {
+        const data = d.data();
+        return data.pledgeNo === undefined || data.pledgeNo === null;
+    });
+
+    const BATCH_SIZE = 400;
+    for (let i = 0; i < docsToUpdate.length; i += BATCH_SIZE) {
+        const batch = writeBatch(firestore);
+        const chunk = docsToUpdate.slice(i, i + BATCH_SIZE);
+        for (const docSnap of chunk) {
+            const docId = docSnap.id;
+            const parts = docId.split('-');
+            const num = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(num)) {
+                batch.update(docSnap.ref, { pledgeNo: num });
+                updated++;
+            }
+        }
+        await batch.commit();
+        if (onProgress) {
+            onProgress(Math.min(i + BATCH_SIZE, docsToUpdate.length), docsToUpdate.length);
+        }
+    }
+
+    return { updated, total: snap.docs.length };
+}
+

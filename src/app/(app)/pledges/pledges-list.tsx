@@ -17,7 +17,7 @@ import { Scheme } from '@/lib/types';
 import { useToast } from "@/hooks/use-toast";
 import { collection, query, where, doc, deleteDoc, limit, getDoc, orderBy } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { clearAllPledges, deletePledge } from "@/firebase/firestore/pledges";
+import { clearAllPledges, deletePledge, backfillPledgeNumbers } from "@/firebase/firestore/pledges";
 import { calculateInterest } from "@/lib/interest";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -229,6 +229,13 @@ export default function PledgesList() {
     );
     const { data: customer, isLoading: isLoadingCustomer } = useDoc<Customer>(customerRef);
 
+    // Track shop counters to ensure the absolute latest pledge (e.g. TEP-2460) is always available
+    const counterRef = useMemoFirebase(
+        () => (firestore && userProfile?.shopId ? doc(firestore, 'counters', `pledge_${userProfile.shopId}`) : null),
+        [firestore, userProfile?.shopId]
+    );
+    const { data: counterDoc } = useDoc<{ lastId: number }>(counterRef);
+
     const pledgesQuery = useMemoFirebase(() => {
         if (!firestore || !userProfile) return null;
 
@@ -238,20 +245,28 @@ export default function PledgesList() {
             q = query(q, where('customerId', '==', customerIdFilter));
         }
 
-        // If not using fallback query, order by createdAt desc to fetch the latest pledges first!
+        // Fetch most recently created pledges first
         if (!useFallbackQuery) {
             q = query(q, orderBy('createdAt', 'desc'));
-
-            // Limit the number of records fetched from Firestore to prevent quota exhaustion
-            if (dataLimit > 0) {
-                q = query(q, limit(dataLimit));
-            }
         }
+
+        // CRITICAL QUOTA FIX: Limit is ALWAYS applied (even in fallback mode).
+        // Never allow unbounded queries to avoid exhausting the 50k daily read quota!
+        const effectiveLimit = dataLimit > 0 ? dataLimit : 50;
+        q = query(q, limit(effectiveLimit));
 
         return q;
     }, [firestore, userProfile, customerIdFilter, dataLimit, useFallbackQuery]);
 
     const { data: pledges, isLoading: isLoadingPledges, error: pledgesError } = useCollection<Pledge>(pledgesQuery);
+
+    const isQuotaExceeded = Boolean(
+        pledgesError && (
+            (pledgesError as any)?.code === 'resource-exhausted' ||
+            pledgesError.message?.toLowerCase().includes('quota') ||
+            pledgesError.message?.toLowerCase().includes('usage limit')
+        )
+    );
 
     // If Firestore reports missing composite index, gracefully switch to fallback query and show index creation link
     useEffect(() => {
@@ -265,6 +280,42 @@ export default function PledgesList() {
             }
         }
     }, [pledgesError, useFallbackQuery]);
+
+    const [latestPledge, setLatestPledge] = useState<Pledge | null>(null);
+
+    // Guaranteed TEP-2460 display: If counter has highest ID (e.g. 2460), ensure it is directly fetched if not in batch
+    useEffect(() => {
+        if (!firestore || !userProfile?.shopId || !counterDoc?.lastId) return;
+
+        let cancelled = false;
+        const fetchLatestPledge = async () => {
+            const samplePrefix = pledges?.[0]?.id?.split('-')?.[0] || 'TEP';
+            const targetId = `${samplePrefix}-${counterDoc.lastId}`;
+
+            // If already in loaded pledges, no extra database query needed
+            if (pledges?.some(p => p.id === targetId)) {
+                setLatestPledge(null);
+                return;
+            }
+
+            try {
+                const docSnap = await getDoc(doc(firestore, 'pledges', targetId));
+                if (!cancelled && docSnap.exists()) {
+                    const data = { ...docSnap.data(), id: docSnap.id } as Pledge;
+                    if (data.shopId === userProfile.shopId) {
+                        setLatestPledge(data);
+                    }
+                }
+            } catch (err) {
+                console.warn("Could not direct-fetch latest pledge:", err);
+            }
+        };
+
+        fetchLatestPledge();
+        return () => {
+            cancelled = true;
+        };
+    }, [counterDoc?.lastId, firestore, userProfile?.shopId, pledges]);
 
     const [directFoundPledge, setDirectFoundPledge] = useState<Pledge | null>(null);
     const [isSearchingDb, setIsSearchingDb] = useState(false);
@@ -291,12 +342,12 @@ export default function PledgesList() {
         const searchDirect = async () => {
             setIsSearchingDb(true);
             try {
-                // Try exact ID (e.g. "PL-101" or "GP-5")
+                // Try exact ID (e.g. "PL-101" or "GP-5" or "TEP-2460")
                 let pledgeDoc = await getDoc(doc(firestore, 'pledges', term));
 
-                // If not found and term is digits (e.g. "101"), try with shop prefix
+                // If not found and term is digits (e.g. "2460"), try with shop prefix
                 if (!pledgeDoc.exists() && /^\d+$/.test(term)) {
-                    const samplePrefix = pledges?.[0]?.id?.split('-')?.[0];
+                    const samplePrefix = pledges?.[0]?.id?.split('-')?.[0] || 'TEP';
                     if (samplePrefix) {
                         pledgeDoc = await getDoc(doc(firestore, 'pledges', `${samplePrefix}-${term}`));
                     }
@@ -325,10 +376,15 @@ export default function PledgesList() {
     }, [searchTerm, firestore, userProfile, pledges]);
 
     const allPledgesList = useMemo(() => {
-        if (!directFoundPledge) return pledges || [];
-        if (pledges?.some(p => p.id === directFoundPledge.id)) return pledges;
-        return [directFoundPledge, ...(pledges || [])];
-    }, [pledges, directFoundPledge]);
+        let list = pledges ? [...pledges] : [];
+        if (latestPledge && !list.some(p => p.id === latestPledge.id)) {
+            list.unshift(latestPledge);
+        }
+        if (directFoundPledge && !list.some(p => p.id === directFoundPledge.id)) {
+            list.unshift(directFoundPledge);
+        }
+        return list;
+    }, [pledges, latestPledge, directFoundPledge]);
 
     // Reset pagination to page 1 whenever search, filters, or page size change
     useEffect(() => {
@@ -338,42 +394,36 @@ export default function PledgesList() {
     const filteredPledges = useMemo(() => {
         if (!allPledgesList) return [];
 
-        const filtered = allPledgesList.filter(pledge => {
-            const pledgeDate = new Date(pledge.createdAt);
+        return allPledgesList
+            .filter(pledge => {
+                const pledgeDate = new Date(pledge.createdAt);
+                const searchMatch = searchTerm
+                    ? pledge.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    pledge.customerName.toLowerCase().includes(searchTerm.toLowerCase())
+                    : true;
+                const statusMatch = statusFilter !== 'All' ? pledge.status === statusFilter : true;
+                const metalTypeMatch = metalTypeFilter !== 'All'
+                    ? pledge.items.some(item => item.metalType === metalTypeFilter)
+                    : true;
+                const startDateMatch = startDate ? pledgeDate >= startDate : true;
+                const endDateMatch = endDate ? pledgeDate <= new Date(endDate.getTime() + 24 * 60 * 60 * 1000 - 1) : true;
 
-            const searchMatch = searchTerm
-                ? pledge.id.toLowerCase().includes(searchTerm.toLowerCase()) || pledge.customerName.toLowerCase().includes(searchTerm.toLowerCase())
-                : true;
+                return searchMatch && statusMatch && metalTypeMatch && startDateMatch && endDateMatch;
+            })
+            .sort((a, b) => {
+                // Extract numeric part after the hyphen (e.g., "TEP-2460" -> 2460)
+                const numA = a.pledgeNo ?? parseInt(a.id.split('-').pop() || '0', 10);
+                const numB = b.pledgeNo ?? parseInt(b.id.split('-').pop() || '0', 10);
 
-            const statusMatch = statusFilter !== 'All' ? pledge.status === statusFilter : true;
+                // Compare numerically descending (highest ID first, e.g. TEP-2460 before TEP-2459)
+                if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+                    return numB - numA;
+                }
 
-            const metalTypeMatch = metalTypeFilter !== 'All'
-                ? pledge.items.some(item => item.metalType === metalTypeFilter)
-                : true;
-
-            const startDateMatch = startDate ? pledgeDate >= startDate : true;
-
-            const endDateMatch = endDate ? pledgeDate <= new Date(endDate.getTime() + 24 * 60 * 60 * 1000 - 1) : true; // Include the whole end day
-
-            return searchMatch && statusMatch && metalTypeMatch && startDateMatch && endDateMatch;
-
-        }).sort((a, b) => {
-            const numA = parseInt(a.id.split('-').pop() || '0', 10);
-            const numB = parseInt(b.id.split('-').pop() || '0', 10);
-            if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
-                return numB - numA;
-            }
-            return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
-        });
-
-        // In fallback mode, when dataLimit is set and no search or date filter is active, cap to dataLimit latest records
-        if (useFallbackQuery && dataLimit > 0 && !searchTerm && statusFilter === 'All' && metalTypeFilter === 'All' && !startDate && !endDate) {
-            return filtered.slice(0, dataLimit);
-        }
-
-        return filtered;
-    }, [allPledgesList, searchTerm, statusFilter, metalTypeFilter, startDate, endDate, useFallbackQuery, dataLimit]);
-
+                // Fallback string comparison
+                return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true, sensitivity: 'base' });
+            });
+    }, [allPledgesList, searchTerm, statusFilter, metalTypeFilter, startDate, endDate]);
     // Paginated slice for the table view
     const totalPages = Math.max(1, Math.ceil(filteredPledges.length / pageSize));
     const paginatedPledges = useMemo(() => {
@@ -537,7 +587,7 @@ export default function PledgesList() {
                                 <SelectItem value="50">Fetch 50</SelectItem>
                                 <SelectItem value="100">Fetch 100</SelectItem>
                                 <SelectItem value="250">Fetch 250</SelectItem>
-                                <SelectItem value="0">Fetch All</SelectItem>
+                                <SelectItem value="500">Fetch 500</SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -551,6 +601,15 @@ export default function PledgesList() {
                 </div>
             </CardHeader>
             <CardContent>
+                {isQuotaExceeded && (
+                    <div className="mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-800 dark:text-red-200 flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400 mt-0.5" />
+                        <div>
+                            <strong>Daily Firestore Read Limit Reached:</strong> Firebase Spark Free Tier allows 50,000 document reads per day.
+                            Displaying locally cached records. Queries are now capped to {dataLimit} records to save quota. The daily quota will automatically reset at midnight.
+                        </div>
+                    </div>
+                )}
                 {indexErrorUrl && (
                     <div className="mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-amber-800 dark:text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
@@ -628,11 +687,11 @@ export default function PledgesList() {
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => setDataLimit(0)}
+                                    onClick={() => setDataLimit(250)}
                                     className="gap-2"
                                 >
                                     <Search className="h-4 w-4" />
-                                    Search entire database (Load All)
+                                    Fetch more records (Load 250)
                                 </Button>
                             </div>
                         )}
