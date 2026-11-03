@@ -241,8 +241,9 @@ export default function CustomerDetailPage() {
                                         sortedPledges.map(pledge => {
                                             const scheme = schemes?.find(s => s.id === pledge.schemeId);
                                             const { interestDue } = calculateInterest(pledge, scheme);
+                                            const currentInterestDue = Math.max(0, interestDue - (pledge.interestPaid || 0));
                                             const outstandingPrincipal = pledge.loanAmount - pledge.paidAmount;
-                                            const totalOutstanding = outstandingPrincipal + interestDue;
+                                            const totalOutstanding = outstandingPrincipal + currentInterestDue;
                                             return (
                                                 <TableRow key={pledge.id} onClick={() => router.push(`/pledges/${pledge.id}`)} className="cursor-pointer">
                                                     <TableCell className="font-medium">{pledge.id}</TableCell>

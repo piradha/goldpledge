@@ -77,7 +77,6 @@ export function getApplicableInterestRate(
       return tier.rate;
     }
   }
-
   return tiers[tiers.length - 1].rate;
 }
 
@@ -129,14 +128,13 @@ export function calculateInterest(
     const currentRate = getApplicableInterestRate(pledge, scheme || undefined, Math.max(1, totalMonthsPassed));
 
     for (let m = startMonthIndex; m <= totalMonthsPassed; m++) {
-      const monthRate = getApplicableInterestRate(pledge, scheme || undefined, m);
-      const monthlyInterest = outstandingPrincipal * (monthRate / 100);
+      const monthlyInterest = outstandingPrincipal * (currentRate / 100);
 
       interestAccruedSincePayment += monthlyInterest;
 
       breakdown.push({
         monthIndex: m,
-        rate: monthRate,
+        rate: currentRate,
         principal: outstandingPrincipal,
         interestAccrued: monthlyInterest
       });
@@ -168,14 +166,13 @@ export function calculateInterest(
   }
 
   for (let m = 2; m <= monthsPassed; m++) {
-    const monthRate = getApplicableInterestRate(pledge, scheme || undefined, m);
-    const monthlyInterest = outstandingPrincipal * (monthRate / 100);
+    const monthlyInterest = outstandingPrincipal * (currentRate / 100);
 
     totalInterest += monthlyInterest;
 
     breakdown.push({
       monthIndex: m,
-      rate: monthRate,
+      rate: currentRate,
       principal: outstandingPrincipal,
       interestAccrued: monthlyInterest
     });

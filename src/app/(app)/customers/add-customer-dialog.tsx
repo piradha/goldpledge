@@ -19,10 +19,11 @@ import * as z from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Customer, UserProfile } from "@/lib/types";
-import { Camera, FileImage, Loader2, User, SwitchCamera } from "lucide-react";
+import { Camera, FileImage, Loader2, User, SwitchCamera, Upload, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useCollection, useDoc, useFirebase, useMemoFirebase, useUser } from "@/firebase";
+import { compressImage } from "@/lib/utils";
 import { addCustomer } from "@/firebase/firestore/customers";
 import { collection, where, query, doc } from "firebase/firestore";
 import Image from "next/image";
@@ -55,6 +56,8 @@ export function AddCustomerDialog({ children }: AddCustomerDialogProps) {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
 
   const { toast } = useToast();
   const { firestore } = useFirebase();
@@ -145,10 +148,23 @@ export function AddCustomerDialog({ children }: AddCustomerDialogProps) {
         const context = canvas.getContext('2d');
         
         if (context) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-            const dataUrl = canvas.toDataURL('image/png');
+            let width = video.videoWidth || 640;
+            let height = video.videoHeight || 480;
+            const maxDim = 800;
+            if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                    height = Math.round((height * maxDim) / width);
+                    width = maxDim;
+                } else {
+                    width = Math.round((width * maxDim) / height);
+                    height = maxDim;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            context.drawImage(video, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
             if (cameraFor === 'customer') {
               setCustomerPhoto(dataUrl);
               form.setValue("photoDataUrl", dataUrl);
@@ -156,6 +172,48 @@ export function AddCustomerDialog({ children }: AddCustomerDialogProps) {
             setCameraFor(null);
         }
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        toast({
+            variant: 'destructive',
+            title: 'Invalid File',
+            description: 'Please select an image file (PNG, JPG, JPEG, WEBP).',
+        });
+        return;
+    }
+
+    setIsProcessingImage(true);
+    try {
+        const compressed = await compressImage(file, 800, 800, 0.75);
+        setCustomerPhoto(compressed);
+        form.setValue("photoDataUrl", compressed);
+        toast({
+            title: 'Photo Uploaded',
+            description: 'Customer photo uploaded successfully.',
+        });
+    } catch (err) {
+        console.error('Error processing customer photo:', err);
+        toast({
+            variant: 'destructive',
+            title: 'Upload Failed',
+            description: 'Failed to process the selected image.',
+        });
+    } finally {
+        setIsProcessingImage(false);
+        if (e.target) {
+            e.target.value = '';
+        }
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setCustomerPhoto(null);
+    form.setValue("photoDataUrl", "");
   };
 
 
@@ -254,17 +312,39 @@ export function AddCustomerDialog({ children }: AddCustomerDialogProps) {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2 flex flex-col items-center">
-                        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
+                        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center overflow-hidden border">
                             {customerPhoto ? (
                                 <img src={customerPhoto} alt="Customer photo" className="w-full h-full rounded-full object-cover" />
                             ) : (
                                 <User className="w-12 h-12 text-muted-foreground" />
                             )}
                         </div>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setCameraFor('customer')}>
-                            <Camera className="mr-2 h-4 w-4" />
-                            {customerPhoto ? 'Retake Photo' : 'Take Photo'}
-                        </Button>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleFileUpload}
+                        />
+                        <div className="flex flex-wrap gap-1.5 justify-center">
+                            <Button type="button" variant="outline" size="sm" onClick={() => setCameraFor('customer')} disabled={isProcessingImage}>
+                                <Camera className="mr-1 h-3.5 w-3.5" />
+                                {customerPhoto ? 'Retake' : 'Camera'}
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isProcessingImage}>
+                                {isProcessingImage ? (
+                                    <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <Upload className="mr-1 h-3.5 w-3.5" />
+                                )}
+                                {customerPhoto ? 'Change' : 'Upload'}
+                            </Button>
+                            {customerPhoto && (
+                                <Button type="button" variant="ghost" size="sm" onClick={handleRemovePhoto} disabled={isProcessingImage} className="text-destructive hover:text-destructive h-8 px-2">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                            )}
+                        </div>
                     </div>
                      <div className="space-y-4">
                         <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Full Name</FormLabel><FormControl><Input placeholder="e.g. John Doe" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>

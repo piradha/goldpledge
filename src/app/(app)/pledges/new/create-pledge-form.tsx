@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Camera, Plus, Trash2, Printer, ImageIcon, Loader2, ChevronsUpDown, Check, SwitchCamera, CheckCircle } from "lucide-react";
+import { Camera, Plus, Trash2, Printer, ImageIcon, Loader2, ChevronsUpDown, Check, SwitchCamera, CheckCircle, Upload } from "lucide-react";
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useCollection, useFirebase, useMemoFirebase, useUser, useDoc } from "@/firebase";
@@ -25,7 +25,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import Link from "next/link";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
+import { cn, compressImage } from "@/lib/utils";
 import { format, add, parse, isValid } from "date-fns";
 
 /* ------------------------------------------------------------------ */
@@ -287,11 +287,13 @@ export function CreatePledgeForm({ editId }: { editId?: string }) {
     const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
     const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
     const [photo, setPhoto] = useState<string | null>(null);
+    const [isProcessingImage, setIsProcessingImage] = useState(false);
     const [showSuccessDialog, setShowSuccessDialog] = useState(false);
     const [lastPledgeId, setLastPledgeId] = useState<string | null>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Refs for keyboard navigation
     const loanDateRef = useRef<HTMLInputElement>(null);
@@ -545,15 +547,70 @@ export function CreatePledgeForm({ editId }: { editId?: string }) {
             const context = canvas.getContext('2d');
 
             if (context) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-                const dataUrl = canvas.toDataURL('image/png');
+                let width = video.videoWidth || 640;
+                let height = video.videoHeight || 480;
+                const maxDim = 800;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                context.drawImage(video, 0, 0, width, height);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
                 setPhoto(dataUrl);
                 form.setValue("itemImageUrl", dataUrl);
                 setShowCamera(false);
             }
         }
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            toast({
+                variant: 'destructive',
+                title: 'Invalid File',
+                description: 'Please select an image file (PNG, JPG, JPEG, WEBP).',
+            });
+            return;
+        }
+
+        setIsProcessingImage(true);
+        try {
+            const compressed = await compressImage(file, 800, 800, 0.75);
+            setPhoto(compressed);
+            form.setValue("itemImageUrl", compressed);
+            toast({
+                title: 'Photo Uploaded',
+                description: 'Item photo uploaded successfully.',
+            });
+        } catch (err) {
+            console.error('Error processing uploaded image:', err);
+            toast({
+                variant: 'destructive',
+                title: 'Upload Failed',
+                description: 'Failed to process the selected image. Please try another file.',
+            });
+        } finally {
+            setIsProcessingImage(false);
+            if (e.target) {
+                e.target.value = '';
+            }
+        }
+    };
+
+    const handleRemovePhoto = () => {
+        setPhoto(null);
+        form.setValue("itemImageUrl", "");
     };
 
     const getPledgeDataFromForm = (): Omit<Pledge, 'id' | 'status' | 'paidAmount'> | null => {
@@ -1141,17 +1198,43 @@ export function CreatePledgeForm({ editId }: { editId?: string }) {
                                         </div>
                                     ) : (
                                         <div className="space-y-4 flex flex-col items-center">
-                                            <div className="w-full aspect-video rounded-md bg-muted flex items-center justify-center">
+                                            <div className="w-full aspect-video rounded-md bg-muted flex items-center justify-center overflow-hidden border border-border">
                                                 {photo ? (
-                                                    <Image src={photo} alt="Pledged item" width={160} height={90} className="rounded-md object-cover w-full h-full" />
+                                                    <Image src={photo} alt="Pledged item" width={320} height={180} unoptimized className="rounded-md object-contain w-full h-full" />
                                                 ) : (
-                                                    <ImageIcon className="w-16 h-16 text-muted-foreground" />
+                                                    <div className="flex flex-col items-center gap-1 text-muted-foreground p-4 text-center">
+                                                        <ImageIcon className="w-12 h-12" />
+                                                        <span className="text-xs">No photo selected</span>
+                                                    </div>
                                                 )}
                                             </div>
-                                            <Button type="button" variant="outline" size="sm" onClick={() => setShowCamera(true)}>
-                                                <Camera className="mr-2 h-4 w-4" />
-                                                {photo ? 'Retake Photo' : 'Take Photo'}
-                                            </Button>
+                                            <input
+                                                type="file"
+                                                ref={fileInputRef}
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={handleFileUpload}
+                                            />
+                                            <div className="flex flex-wrap gap-2 justify-center w-full">
+                                                <Button type="button" variant="outline" size="sm" onClick={() => setShowCamera(true)} disabled={isProcessingImage}>
+                                                    <Camera className="mr-2 h-4 w-4" />
+                                                    {photo ? 'Retake' : 'Take Photo'}
+                                                </Button>
+                                                <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isProcessingImage}>
+                                                    {isProcessingImage ? (
+                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <Upload className="mr-2 h-4 w-4" />
+                                                    )}
+                                                    {photo ? 'Change File' : 'Upload Photo'}
+                                                </Button>
+                                                {photo && (
+                                                    <Button type="button" variant="ghost" size="sm" onClick={handleRemovePhoto} disabled={isProcessingImage} className="text-destructive hover:text-destructive">
+                                                        <Trash2 className="mr-1 h-4 w-4" />
+                                                        Remove
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     )}
                                 </CardContent>

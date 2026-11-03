@@ -212,14 +212,15 @@ export default function MakePaymentPage() {
     if (paymentType === 'Interest') {
       // Use outstanding principal (after partial payments), not the original loan amount
       const outstanding = (Number(pledge.loanAmount) || 0) - (Number(pledge.paidAmount) || 0);
-      const oneMonthInterest = outstanding * ((Number(pledge.interestRate) || 0) / 100);
+      const activeRate = Number(rate || pledge.interestRate) || 0;
+      const oneMonthInterest = outstanding * (activeRate / 100);
       form.setValue('amount', parseFloat((oneMonthInterest * (monthsToPay || 1)).toFixed(2)));
     } else if (paymentType === 'Settlement') {
       form.setValue('amount', parseFloat(totalDueForSettlement.toFixed(0)));
     } else if (paymentType === 'Partial') {
       // Don't auto-set amount for partial payments as user needs to enter it
     }
-  }, [paymentType, monthsToPay, pledge, form, totalDueForSettlement]);
+  }, [paymentType, monthsToPay, pledge, form, totalDueForSettlement, rate]);
 
   if (pledge && userProfile && pledge.shopId !== userProfile.shopId) {
       return (
@@ -477,14 +478,14 @@ export default function MakePaymentPage() {
                   <>
                     <div className="flex justify-between text-sm sm:text-base text-muted-foreground">
                       <span>One Month Interest:</span>
-                      <span className="font-medium">₹{Math.round(outstandingPrincipal * (pledge.interestRate / 100)).toLocaleString('en-IN')}</span>
+                      <span className="font-medium">₹{Math.round(outstandingPrincipal * ((rate || pledge.interestRate) / 100)).toLocaleString('en-IN')}</span>
                     </div>
                     <div className="flex justify-between text-sm sm:text-base text-muted-foreground">
                       <span>Calculation:</span>
                       <span className="font-medium">
                         {lastPartialDateText 
-                          ? `${monthsPassed} months × ₹${Math.round(outstandingPrincipal * (pledge.interestRate / 100)).toLocaleString('en-IN')} = ₹${Math.round(grossInterestAccrued).toLocaleString('en-IN')}`
-                          : `${Math.max(0, monthsPassed - 1)} months × ₹${Math.round(outstandingPrincipal * (pledge.interestRate / 100)).toLocaleString('en-IN')} = ₹${Math.round(grossInterestAccrued).toLocaleString('en-IN')}`}
+                          ? `${monthsPassed} months × ₹${Math.round(outstandingPrincipal * ((rate || pledge.interestRate) / 100)).toLocaleString('en-IN')} = ₹${Math.round(grossInterestAccrued).toLocaleString('en-IN')}`
+                          : `${Math.max(0, monthsPassed - 1)} months × ₹${Math.round(outstandingPrincipal * ((rate || pledge.interestRate) / 100)).toLocaleString('en-IN')} = ₹${Math.round(grossInterestAccrued).toLocaleString('en-IN')}`}
                       </span>
                     </div>
                   </>
