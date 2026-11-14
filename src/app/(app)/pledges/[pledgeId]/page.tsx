@@ -230,11 +230,11 @@ export default function PledgeDetailPage() {
                             <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                                 <div className="space-y-1">
                                     <p className="text-muted-foreground">Loan Amount</p>
-                                    <p className="font-semibold text-lg">₹{pledge.loanAmount.toLocaleString('en-IN')}</p>
+                                    <p className="font-semibold text-lg">₹{(Number(pledge.loanAmount) || 0).toLocaleString('en-IN')}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-muted-foreground">Principal Paid</p>
-                                    <p className="font-semibold text-lg text-green-500">₹{pledge.paidAmount.toLocaleString('en-IN')}</p>
+                                    <p className="font-semibold text-lg text-green-500">₹{(Number(pledge.paidAmount) || 0).toLocaleString('en-IN')}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <p className="text-muted-foreground">Interest Accrued</p>
@@ -259,8 +259,15 @@ export default function PledgeDetailPage() {
                     </Card>
 
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Payment History</CardTitle>
+                            {pledge.status !== 'CLOSED' && (
+                                <Button asChild size="sm" variant="outline">
+                                    <Link href={`/pledges/${pledge.id}/make-payment`}>
+                                        Make Payment
+                                    </Link>
+                                </Button>
+                            )}
                         </CardHeader>
                         <CardContent>
                             <Table>
@@ -269,6 +276,7 @@ export default function PledgeDetailPage() {
                                         <TableHead>Date</TableHead>
                                         <TableHead>Type</TableHead>
                                         <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="text-center w-16">Receipt</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -277,14 +285,24 @@ export default function PledgeDetailPage() {
                                             <TableRow key={payment.id}>
                                                 <TableCell>{new Date(payment.paymentDate).toLocaleDateString('en-IN')}</TableCell>
                                                 <TableCell>
-                                                    <Badge variant="secondary">{payment.paymentType}</Badge>
+                                                    <Badge variant={payment.paymentType === 'Settlement' ? 'default' : payment.paymentType === 'Partial' ? 'secondary' : 'outline'}>
+                                                        {payment.paymentType}
+                                                    </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right font-medium">₹{payment.amount.toLocaleString('en-IN')}</TableCell>
+                                                <TableCell className="text-center">
+                                                    <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Print Receipt">
+                                                        <Link href={`/print/payment/${payment.id}`} target="_blank">
+                                                            <Printer className="h-4 w-4" />
+                                                            <span className="sr-only">Print Receipt</span>
+                                                        </Link>
+                                                    </Button>
+                                                </TableCell>
                                             </TableRow>
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={3} className="text-center text-muted-foreground">No payments recorded yet.</TableCell>
+                                            <TableCell colSpan={4} className="text-center text-muted-foreground">No payments recorded yet.</TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>

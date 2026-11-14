@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { doc, query, where, collection } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { calculateInterest } from '@/lib/interest';
-import { ArrowLeft, CheckCircle, Printer, Loader2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Printer, Loader2, Search, Banknote, Scale, History, ReceiptText, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useForm, FieldErrors } from 'react-hook-form';
@@ -29,6 +29,11 @@ import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
 import { RepledgeHistoryCard } from '@/app/(app)/pledges/repledge-history-card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+
+const formatCurrency = (val: number | undefined | null) => (Number(val) || 0).toLocaleString('en-IN');
 
 const formSchema = z.object({
   paymentType: z.enum(['Interest', 'Partial', 'Settlement'], { required_error: 'Please select a payment type.' }),
@@ -62,6 +67,283 @@ function MakePaymentSkeleton() {
   );
 }
 
+function PaidInterestSection({
+  payments,
+  totalInterestPaid,
+  pledgeInterestPaid,
+  isAdvanceInterest,
+}: {
+  payments: Payment[];
+  totalInterestPaid: number;
+  pledgeInterestPaid: number;
+  isAdvanceInterest: boolean;
+}) {
+  if (payments.length === 0) {
+    return (
+      <div className="py-8 text-center text-muted-foreground space-y-2">
+        <Banknote className="mx-auto h-8 w-8 opacity-40 text-amber-500" />
+        <p className="font-medium text-sm sm:text-base">No interest payments recorded yet for this pledge.</p>
+        {isAdvanceInterest && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 py-1.5 px-3 rounded-md inline-block">
+            ℹ️ 1st month advance interest was included at the time of pledge creation.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40">
+              <TableHead className="w-12 text-center font-semibold">#</TableHead>
+              <TableHead className="font-semibold">Payment Date</TableHead>
+              <TableHead className="font-semibold">Receipt No</TableHead>
+              <TableHead className="text-right font-semibold">Interest Paid</TableHead>
+              <TableHead className="text-right font-semibold">Adjustment</TableHead>
+              <TableHead className="text-center w-16 font-semibold">Receipt</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {payments.map((p, idx) => (
+              <TableRow key={p.id} className="hover:bg-muted/30">
+                <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
+                <TableCell className="font-medium whitespace-nowrap">
+                  {p.paymentDate ? format(new Date(p.paymentDate), 'dd-MMM-yyyy') : '-'}
+                </TableCell>
+                <TableCell className="font-mono text-xs">
+                  {p.id.slice(-6).toUpperCase()}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
+                  ₹{(Number(p.amount) || 0).toLocaleString('en-IN')}
+                </TableCell>
+                <TableCell className="text-right text-xs whitespace-nowrap">
+                  {p.adjustment && Number(p.adjustment) !== 0 ? (
+                    <span className={Number(p.adjustment) > 0 ? "text-amber-600 font-medium" : "text-blue-600 font-medium"}>
+                      {Number(p.adjustment) > 0 ? `+₹${p.adjustment}` : `-₹${Math.abs(p.adjustment)}`}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-center">
+                  <Button asChild variant="ghost" size="icon" className="h-8 w-8 hover:text-primary" title="Print Receipt">
+                    <Link href={`/print/payment/${p.id}`} target="_blank">
+                      <Printer className="h-4 w-4" />
+                      <span className="sr-only">Print Receipt</span>
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell colSpan={3} className="font-bold">Total Interest Paid</TableCell>
+              <TableCell className="text-right font-bold text-green-600 dark:text-green-400">
+                ₹{formatCurrency(totalInterestPaid)}
+              </TableCell>
+              <TableCell colSpan={2} className="text-right text-xs text-muted-foreground">
+                {(Number(pledgeInterestPaid) || 0) > (Number(totalInterestPaid) || 0) && (
+                  <span>(Total recorded: ₹{formatCurrency(pledgeInterestPaid)})</span>
+                )}
+              </TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
+      {isAdvanceInterest && (
+        <p className="text-xs text-muted-foreground italic">
+          * Month 1 advance interest was collected at pledge creation.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PartialPaymentsSection({
+  payments,
+  totalPrincipalPaid,
+  outstandingPrincipal,
+  loanAmount,
+}: {
+  payments: (Payment & { paymentIndex: number; remainingPrincipal: number })[];
+  totalPrincipalPaid: number;
+  outstandingPrincipal: number;
+  loanAmount: number;
+}) {
+  if (payments.length === 0) {
+    return (
+      <div className="py-8 text-center text-muted-foreground space-y-2">
+        <Scale className="mx-auto h-8 w-8 opacity-40 text-emerald-500" />
+        <p className="font-medium text-sm sm:text-base">No partial payments recorded yet for this pledge.</p>
+        <p className="text-xs">
+          Original loan amount remains ₹{formatCurrency(loanAmount)}.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40">
+              <TableHead className="w-12 text-center font-semibold">#</TableHead>
+              <TableHead className="font-semibold">Payment Date</TableHead>
+              <TableHead className="font-semibold">Receipt No</TableHead>
+              <TableHead className="text-right font-semibold">Principal Paid</TableHead>
+              <TableHead className="text-right font-semibold">Balance Principal</TableHead>
+              <TableHead className="text-right font-semibold">Adjustment</TableHead>
+              <TableHead className="text-center w-16 font-semibold">Receipt</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {payments.map((p, idx) => (
+              <TableRow key={p.id} className="hover:bg-muted/30">
+                <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
+                <TableCell className="font-medium whitespace-nowrap">
+                  {p.paymentDate ? format(new Date(p.paymentDate), 'dd-MMM-yyyy') : '-'}
+                </TableCell>
+                <TableCell className="font-mono text-xs">
+                  {p.id.slice(-6).toUpperCase()}
+                </TableCell>
+                <TableCell className="text-right font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">
+                  ₹{(Number(p.amount) || 0).toLocaleString('en-IN')}
+                </TableCell>
+                <TableCell className="text-right font-medium text-foreground whitespace-nowrap">
+                  ₹{(Number(p.remainingPrincipal) || 0).toLocaleString('en-IN')}
+                </TableCell>
+                <TableCell className="text-right text-xs whitespace-nowrap">
+                  {p.adjustment && Number(p.adjustment) !== 0 ? (
+                    <span className={Number(p.adjustment) > 0 ? "text-amber-600 font-medium" : "text-blue-600 font-medium"}>
+                      {Number(p.adjustment) > 0 ? `+₹${p.adjustment}` : `-₹${Math.abs(p.adjustment)}`}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-center">
+                  <Button asChild variant="ghost" size="icon" className="h-8 w-8 hover:text-primary" title="Print Receipt">
+                    <Link href={`/print/payment/${p.id}`} target="_blank">
+                      <Printer className="h-4 w-4" />
+                      <span className="sr-only">Print Receipt</span>
+                    </Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+          <TableFooter>
+            <TableRow>
+              <TableCell colSpan={3} className="font-bold">Total Principal Paid</TableCell>
+              <TableCell className="text-right font-bold text-green-600 dark:text-green-400">
+                ₹{formatCurrency(totalPrincipalPaid)}
+              </TableCell>
+              <TableCell className="text-right font-bold text-foreground">
+                Bal: ₹{formatCurrency(outstandingPrincipal)}
+              </TableCell>
+              <TableCell colSpan={2}></TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function AllPaymentsSection({
+  payments,
+}: {
+  payments: Payment[];
+}) {
+  if (payments.length === 0) {
+    return (
+      <div className="py-8 text-center text-muted-foreground space-y-2">
+        <ReceiptText className="mx-auto h-8 w-8 opacity-40" />
+        <p className="font-medium text-sm sm:text-base">No payments recorded yet for this pledge.</p>
+      </div>
+    );
+  }
+
+  const grandTotal = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/40">
+            <TableHead className="w-12 text-center font-semibold">#</TableHead>
+            <TableHead className="font-semibold">Payment Date</TableHead>
+            <TableHead className="font-semibold">Receipt No</TableHead>
+            <TableHead className="font-semibold">Payment Type</TableHead>
+            <TableHead className="text-right font-semibold">Amount Paid</TableHead>
+            <TableHead className="text-right font-semibold">Adjustment</TableHead>
+            <TableHead className="text-center w-16 font-semibold">Receipt</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {payments.map((p, idx) => (
+            <TableRow key={p.id} className="hover:bg-muted/30">
+              <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
+              <TableCell className="font-medium whitespace-nowrap">
+                {p.paymentDate ? format(new Date(p.paymentDate), 'dd-MMM-yyyy') : '-'}
+              </TableCell>
+              <TableCell className="font-mono text-xs">
+                {p.id.slice(-6).toUpperCase()}
+              </TableCell>
+              <TableCell>
+                <Badge
+                  variant={p.paymentType === 'Settlement' ? 'default' : p.paymentType === 'Partial' ? 'secondary' : 'outline'}
+                  className={cn(
+                    p.paymentType === 'Interest' && 'bg-blue-500/10 text-blue-600 border-blue-200',
+                    p.paymentType === 'Partial' && 'bg-emerald-500/10 text-emerald-600 border-emerald-200',
+                    p.paymentType === 'Settlement' && 'bg-purple-500/10 text-purple-600 border-purple-200'
+                  )}
+                >
+                  {p.paymentType === 'Interest' ? 'Interest Payment' : p.paymentType === 'Partial' ? 'Partial Principal' : 'Full Settlement'}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right font-semibold whitespace-nowrap">
+                ₹{(Number(p.amount) || 0).toLocaleString('en-IN')}
+              </TableCell>
+              <TableCell className="text-right text-xs whitespace-nowrap">
+                {p.adjustment && Number(p.adjustment) !== 0 ? (
+                  <span className={Number(p.adjustment) > 0 ? "text-amber-600 font-medium" : "text-blue-600 font-medium"}>
+                    {Number(p.adjustment) > 0 ? `+₹${p.adjustment}` : `-₹${Math.abs(p.adjustment)}`}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
+              </TableCell>
+              <TableCell className="text-center">
+                <Button asChild variant="ghost" size="icon" className="h-8 w-8 hover:text-primary" title="Print Receipt">
+                  <Link href={`/print/payment/${p.id}`} target="_blank">
+                    <Printer className="h-4 w-4" />
+                    <span className="sr-only">Print Receipt</span>
+                  </Link>
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        <TableFooter>
+          <TableRow>
+            <TableCell colSpan={4} className="font-bold">Total Paid</TableCell>
+            <TableCell className="text-right font-bold text-green-600 dark:text-green-400">
+              ₹{grandTotal.toLocaleString('en-IN')}
+            </TableCell>
+            <TableCell colSpan={2}></TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>
+    </div>
+  );
+}
+
 export default function MakePaymentPage() {
   const params = useParams();
   const router = useRouter();
@@ -72,6 +354,14 @@ export default function MakePaymentPage() {
 
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [lastPaymentId, setLastPaymentId] = useState<string | null>(null);
+  const [searchPledgeId, setSearchPledgeId] = useState('');
+
+  const handleSearchPledge = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchPledgeId.trim()) {
+      router.push(`/pledges/${encodeURIComponent(searchPledgeId.trim())}/make-payment`);
+    }
+  };
 
   const pledgeRef = useMemoFirebase(
     () => (firestore && pledgeId ? doc(firestore, 'pledges', pledgeId) : null),
@@ -205,6 +495,46 @@ export default function MakePaymentPage() {
     return (Number(amountToPay) || 0) + (Number(adjustment) || 0);
   }, [amountToPay, adjustment]);
 
+  // Chronologically sorted payments for this pledge
+  const sortedPayments = useMemo(() => {
+    if (!payments) return [];
+    return [...payments].sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime());
+  }, [payments]);
+
+  // All interest payments
+  const interestPayments = useMemo(() => {
+    return sortedPayments.filter(p => p.paymentType === 'Interest');
+  }, [sortedPayments]);
+
+  const totalInterestPaidFromPayments = useMemo(() => {
+    return interestPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  }, [interestPayments]);
+
+  // All partial principal payments with progressive remaining balance
+  const partialPaymentsWithBalance = useMemo(() => {
+    if (!pledge) return [];
+    let currentBalance = Number(pledge.loanAmount) || 0;
+    return sortedPayments
+      .filter(p => p.paymentType === 'Partial')
+      .map((payment, idx) => {
+        currentBalance = Math.max(0, currentBalance - (Number(payment.amount) || 0));
+        return {
+          ...payment,
+          paymentIndex: idx + 1,
+          remainingPrincipal: currentBalance,
+        };
+      });
+  }, [sortedPayments, pledge]);
+
+  const totalPartialPaidFromPayments = useMemo(() => {
+    return partialPaymentsWithBalance.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  }, [partialPaymentsWithBalance]);
+
+  // Settlement payments if any
+  const settlementPayments = useMemo(() => {
+    return sortedPayments.filter(p => p.paymentType === 'Settlement');
+  }, [sortedPayments]);
+
 
   useEffect(() => {
     if (!pledge) return;
@@ -241,12 +571,21 @@ export default function MakePaymentPage() {
 
   if (!pledge) {
     return (
-      <Card className="text-center py-12">
+      <Card className="text-center py-12 max-w-lg mx-auto mt-8">
         <CardHeader>
           <CardTitle>Pledge Not Found</CardTitle>
           <CardDescription>The pledge with ID '{pledgeId}' could not be found.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <form onSubmit={handleSearchPledge} className="flex gap-2 max-w-sm mx-auto">
+            <Input
+              type="text"
+              placeholder="Enter valid Pledge ID..."
+              value={searchPledgeId}
+              onChange={(e) => setSearchPledgeId(e.target.value)}
+            />
+            <Button type="submit">Lookup</Button>
+          </form>
           <Button asChild variant="outline">
             <Link href="/pledges">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -344,13 +683,35 @@ export default function MakePaymentPage() {
   return (
     <>
     <div className="w-full space-y-6">
-      <div className="flex items-center gap-4">
-        <Button asChild variant="outline" size="icon">
-          <Link href={`/pledges/${pledgeId}`}>
-            <ArrowLeft />
-          </Link>
-        </Button>
-        <h1 className="text-2xl font-bold">Make Payment</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button asChild variant="outline" size="icon">
+            <Link href={`/pledges/${pledgeId}`}>
+              <ArrowLeft />
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Make Payment</h1>
+            <p className="text-sm text-muted-foreground">Pledge ID: <span className="font-semibold text-foreground">{pledge.id}</span></p>
+          </div>
+        </div>
+
+        {/* Quick Search / Switch Pledge ID */}
+        <form onSubmit={handleSearchPledge} className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Switch Pledge ID..."
+              value={searchPledgeId}
+              onChange={(e) => setSearchPledgeId(e.target.value)}
+              className="pl-8 w-44 sm:w-56 h-9 text-sm"
+            />
+          </div>
+          <Button type="submit" size="sm" variant="secondary">
+            Go
+          </Button>
+        </form>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -363,15 +724,22 @@ export default function MakePaymentPage() {
             <CardContent className="space-y-4 text-base sm:text-lg">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Loan Amount:</span>
-                <span className="font-medium">₹{pledge.loanAmount.toLocaleString('en-IN')}</span>
+                <span className="font-medium">₹{formatCurrency(pledge.loanAmount)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Principal Paid:</span>
-                <span className="font-medium text-green-500">₹{pledge.paidAmount.toLocaleString('en-IN')}</span>
+                <div className="text-right">
+                  <span className="font-medium text-green-500">₹{formatCurrency(pledge.paidAmount)}</span>
+                  {partialPaymentsWithBalance.length > 0 && (
+                    <span className="text-xs text-muted-foreground ml-1.5 font-normal">
+                      ({partialPaymentsWithBalance.length} payment{partialPaymentsWithBalance.length === 1 ? '' : 's'})
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Outstanding Principal:</span>
-                <span className="font-medium">₹{outstandingPrincipal.toLocaleString('en-IN')}</span>
+                <span className="font-medium">₹{formatCurrency(outstandingPrincipal)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Loan Date:</span>
@@ -493,9 +861,16 @@ export default function MakePaymentPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Interest Paid:</span>
-                <span className="font-medium text-green-500">
-                  ₹{Math.round(interestPaid).toLocaleString('en-IN')}
-                </span>
+                <div className="text-right">
+                  <span className="font-medium text-green-500">
+                    ₹{Math.round(interestPaid).toLocaleString('en-IN')}
+                  </span>
+                  {interestPayments.length > 0 && (
+                    <span className="text-xs text-muted-foreground ml-1.5 font-normal">
+                      ({interestPayments.length} payment{interestPayments.length === 1 ? '' : 's'})
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Interest Due:</span>
@@ -667,6 +1042,227 @@ export default function MakePaymentPage() {
             </Form>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Payment Records: Paid Interest & Partial Payments for this pledgeId */}
+      <div className="space-y-4 pt-4 border-t">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" />
+              <span>Payment Records for Pledge {pledge.id}</span>
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Review paid interest and partial principal payment details for {pledge.customerName}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className="text-xs font-medium py-1 px-2.5 bg-background">
+              Total Interest Paid: <span className="font-semibold text-green-600 dark:text-green-400 ml-1">₹{formatCurrency(interestPaid)}</span>
+            </Badge>
+            <Badge variant="outline" className="text-xs font-medium py-1 px-2.5 bg-background">
+              Principal Paid: <span className="font-semibold text-green-600 dark:text-green-400 ml-1">₹{formatCurrency(pledge.paidAmount)}</span>
+            </Badge>
+            <Badge variant="outline" className="text-xs font-medium py-1 px-2.5 bg-background">
+              Outstanding: <span className="font-semibold text-amber-600 ml-1">₹{formatCurrency(outstandingPrincipal)}</span>
+            </Badge>
+          </div>
+        </div>
+
+        {settlementPayments.length > 0 && (
+          <div className="space-y-2">
+            {settlementPayments.map(sp => (
+              <div
+                key={sp.id}
+                className="p-4 rounded-lg border border-purple-300 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-6 w-6 text-purple-600 dark:text-purple-400 shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-base text-purple-900 dark:text-purple-300">
+                      Pledge Full Settlement Recorded
+                    </h4>
+                    <p className="text-sm text-purple-700 dark:text-purple-400">
+                      Settlement payment of ₹{formatCurrency(sp.amount)} recorded on{' '}
+                      {format(new Date(sp.paymentDate), 'dd-MMM-yyyy')} (Receipt #{sp.id.slice(-6).toUpperCase()})
+                    </p>
+                  </div>
+                </div>
+                <Button asChild variant="outline" size="sm" className="border-purple-300 text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:text-purple-300 shrink-0">
+                  <Link href={`/print/payment/${sp.id}`} target="_blank">
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print Settlement Receipt
+                  </Link>
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <Tabs defaultValue="overview" className="w-full">
+          <div className="flex items-center justify-between overflow-x-auto pb-1">
+            <TabsList className="grid w-full sm:w-auto grid-cols-4 max-w-lg">
+              <TabsTrigger value="overview" className="text-xs sm:text-sm">
+                Overview
+              </TabsTrigger>
+              <TabsTrigger value="interest" className="text-xs sm:text-sm">
+                Paid Interest ({interestPayments.length})
+              </TabsTrigger>
+              <TabsTrigger value="partial" className="text-xs sm:text-sm">
+                Partial ({partialPaymentsWithBalance.length})
+              </TabsTrigger>
+              <TabsTrigger value="all" className="text-xs sm:text-sm">
+                All ({sortedPayments.length})
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="overview" className="mt-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              {/* Paid Interest Card */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Banknote className="h-5 w-5 text-amber-500" />
+                      <span>Paid Interest Details</span>
+                    </CardTitle>
+                    <Badge variant="secondary" className="font-semibold">
+                      {interestPayments.length} payment{interestPayments.length === 1 ? '' : 's'}
+                    </Badge>
+                  </div>
+                  <CardDescription>
+                    History of interest payments recorded for this pledge
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <PaidInterestSection
+                    payments={interestPayments}
+                    totalInterestPaid={totalInterestPaidFromPayments}
+                    pledgeInterestPaid={Number(interestPaid) || 0}
+                    isAdvanceInterest={isAdvanceInterest}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Partial Payment Card */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Scale className="h-5 w-5 text-emerald-500" />
+                      <span>Partial Payment Details</span>
+                    </CardTitle>
+                    <Badge variant="secondary" className="font-semibold">
+                      {partialPaymentsWithBalance.length} payment{partialPaymentsWithBalance.length === 1 ? '' : 's'}
+                    </Badge>
+                  </div>
+                  <CardDescription>
+                    Principal reductions and balance progression
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <PartialPaymentsSection
+                    payments={partialPaymentsWithBalance}
+                    totalPrincipalPaid={totalPartialPaidFromPayments}
+                    outstandingPrincipal={outstandingPrincipal}
+                    loanAmount={Number(pledge.loanAmount) || 0}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="interest" className="mt-4">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Banknote className="h-5 w-5 text-amber-500" />
+                      <span>Paid Interest Details (Pledge: {pledge.id})</span>
+                    </CardTitle>
+                    <CardDescription>
+                      Full history of interest payments collected for this pledge
+                    </CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="text-sm px-3 py-1 font-semibold text-green-600 dark:text-green-400">
+                    Total Interest Paid: ₹{formatCurrency(interestPaid)}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <PaidInterestSection
+                  payments={interestPayments}
+                  totalInterestPaid={totalInterestPaidFromPayments}
+                  pledgeInterestPaid={Number(interestPaid) || 0}
+                  isAdvanceInterest={isAdvanceInterest}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="partial" className="mt-4">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Scale className="h-5 w-5 text-emerald-500" />
+                      <span>Partial Principal Payment Details (Pledge: {pledge.id})</span>
+                    </CardTitle>
+                    <CardDescription>
+                      Principal reductions, date recorded, and remaining principal
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="text-xs sm:text-sm px-2.5 py-1">
+                      Loan: ₹{formatCurrency(pledge.loanAmount)}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs sm:text-sm px-2.5 py-1 text-emerald-600 font-semibold">
+                      Paid: ₹{formatCurrency(pledge.paidAmount)}
+                    </Badge>
+                    <Badge variant="destructive" className="text-xs sm:text-sm px-2.5 py-1 font-semibold">
+                      Due: ₹{formatCurrency(outstandingPrincipal)}
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <PartialPaymentsSection
+                  payments={partialPaymentsWithBalance}
+                  totalPrincipalPaid={totalPartialPaidFromPayments}
+                  outstandingPrincipal={outstandingPrincipal}
+                  loanAmount={Number(pledge.loanAmount) || 0}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="all" className="mt-4">
+            <Card>
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <ReceiptText className="h-5 w-5 text-primary" />
+                      <span>All Payment Transactions (Pledge: {pledge.id})</span>
+                    </CardTitle>
+                    <CardDescription>
+                      Complete chronological ledger of all interest, partial, and settlement payments
+                    </CardDescription>
+                  </div>
+                  <Badge variant="secondary" className="text-sm px-3 py-1 font-semibold">
+                    {sortedPayments.length} Total Transaction{sortedPayments.length === 1 ? '' : 's'}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <AllPaymentsSection payments={sortedPayments} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
 
