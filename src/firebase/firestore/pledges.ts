@@ -195,6 +195,8 @@ export async function addPaymentAndUpdatePledge(
             id: paymentRef.id,
             pledgeId: pledgeId,
             shopId: pledge.shopId,
+            customerId: pledge.customerId,
+            customerName: pledge.customerName,
             paymentType: paymentData.paymentType,
             amount: paymentAmount,
             adjustment: Number(paymentData.adjustment) || 0,

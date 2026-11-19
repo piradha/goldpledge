@@ -131,6 +131,9 @@ export type Payment = {
     id: string;
     shopId: string;
     pledgeId: string;
+    customerId?: string;
+    customerName?: string;
+    customerMobile?: string;
     paymentType: 'Interest' | 'Partial' | 'Settlement';
     amount: number;
     paymentDate: string; // ISO string

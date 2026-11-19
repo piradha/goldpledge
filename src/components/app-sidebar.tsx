@@ -20,6 +20,7 @@ import {
   Package,
   Shield,
   Building2,
+  Receipt,
 } from "lucide-react";
 import { useFirebase, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where } from "firebase/firestore";
@@ -31,6 +32,7 @@ const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/schemes", icon: Layers, label: "Schemes" },
   { href: "/pledges", icon: BookHeart, label: "Pledges" },
+  { href: "/payments", icon: Receipt, label: "Payments" },
   { href: "/bank-pledges", icon: Building2, label: "Bank Pledges" },
   { href: "/customers", icon: Users, label: "Customers" },
   { href: "/items", icon: Package, label: "Items" },
@@ -68,7 +70,11 @@ export default function AppSidebar() {
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
-                isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
+                isActive={
+                  pathname === item.href ||
+                  (item.href !== "/dashboard" && pathname.startsWith(item.href)) ||
+                  (item.href === "/payments" && pathname.startsWith("/payment"))
+                }
                 tooltip={item.label}
               >
                 <Link href={item.href}>
