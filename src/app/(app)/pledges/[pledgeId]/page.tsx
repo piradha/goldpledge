@@ -3,7 +3,7 @@
 
 import { useParams } from 'next/navigation';
 import { useDoc, useCollection, useFirebase, useMemoFirebase, useUser } from '@/firebase';
-import { Pledge, Customer, Payment, PledgeItem, UserProfile , Scheme} from '@/lib/types';
+import { Pledge, Customer, Payment, PledgeItem, UserProfile, Scheme } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { doc, collection, query, where } from 'firebase/firestore';
@@ -18,7 +18,7 @@ import Link from 'next/link';
 import { Separator } from '@/components/ui/separator';
 import { useMemo, useRef } from 'react';
 import { ImagePreviewDialog } from '../../customers/image-preview-dialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RepledgeHistoryCard } from '@/app/(app)/pledges/repledge-history-card';
 
 function PledgeDetailSkeleton() {
@@ -114,7 +114,7 @@ export default function PledgeDetailPage() {
         () => (firestore && pledgeId ? doc(firestore, 'pledges', pledgeId) : null),
         [firestore, pledgeId]
     );
-    const { data: pledge, isLoading: isLoadingPledge } = useDoc<Pledge>(pledgeRef); 
+    const { data: pledge, isLoading: isLoadingPledge } = useDoc<Pledge>(pledgeRef);
 
     const customerRef = useMemoFirebase(
         () => (firestore && pledge ? doc(firestore, 'customers', pledge.customerId) : null),
@@ -129,17 +129,17 @@ export default function PledgeDetailPage() {
     const { data: userProfiles, isLoading: isLoadingProfile } = useCollection<UserProfile>(userProfileQuery);
     const userProfile = useMemo(() => (userProfiles && userProfiles[0]) ? userProfiles[0] : null, [userProfiles]);
 
-      const schemesQuery = useMemoFirebase(
+    const schemesQuery = useMemoFirebase(
         () => (firestore && userProfile ? query(collection(firestore, "schemes"), where("shopId", "==", userProfile.shopId)) : null),
         [firestore, userProfile]
-      );
-      const { data: schemes, isLoading: isLoadingSchemes } = useCollection<Scheme>(schemesQuery);
-      const scheme = useMemo(() => {
-      if (!schemes || !pledge?.schemeId) return null;
-    
-      return schemes.find(s => s.id === pledge.schemeId) ?? null;
+    );
+    const { data: schemes, isLoading: isLoadingSchemes } = useCollection<Scheme>(schemesQuery);
+    const scheme = useMemo(() => {
+        if (!schemes || !pledge?.schemeId) return null;
+
+        return schemes.find(s => s.id === pledge.schemeId) ?? null;
     }, [schemes, pledge?.schemeId]);
-    
+
 
     const paymentsQuery = useMemoFirebase(
         () => (firestore && pledgeId ? query(collection(firestore, 'payments'), where('pledgeId', '==', pledgeId)) : null),
@@ -147,7 +147,7 @@ export default function PledgeDetailPage() {
     );
     const { data: payments, isLoading: isLoadingPayments } = useCollection<Payment>(paymentsQuery);
 
-    const isLoading = isLoadingPledge || isLoadingCustomer || isLoadingProfile || isLoadingPayments || isLoadingSchemes; 
+    const isLoading = isLoadingPledge || isLoadingCustomer || isLoadingProfile || isLoadingPayments || isLoadingSchemes;
 
     // Security check: ensure the pledge belongs to the user's shop
     if (pledge && userProfile && pledge.shopId !== userProfile.shopId) {
@@ -184,7 +184,7 @@ export default function PledgeDetailPage() {
         );
     }
 
-    const { interestDue: grossInterestAccrued,rate } = calculateInterest(pledge, scheme, new Date(), payments || []);
+    const { interestDue: grossInterestAccrued, rate } = calculateInterest(pledge, scheme, new Date(), payments || []);
     const interestPaid = pledge.interestPaid || 0;
     const currentInterestDue = Math.max(0, grossInterestAccrued - interestPaid);
     const outstandingPrincipal = pledge.loanAmount - pledge.paidAmount;
@@ -336,52 +336,52 @@ export default function PledgeDetailPage() {
                             <CardTitle>Loan Terms</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
-                             <div className="flex justify-between">
-  <span className="text-muted-foreground">Scheme Name:</span>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Scheme Name:</span>
 
-  <TooltipProvider>
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="cursor-pointer text-primary underline underline-offset-2">
-          {pledge.schemeName}
-        </span>
-      </TooltipTrigger>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="cursor-pointer text-primary underline underline-offset-2">
+                                                {pledge.schemeName}
+                                            </span>
+                                        </TooltipTrigger>
 
-      <TooltipContent className="p-3 w-56">
-        <div className="space-y-1">
-          <div className="font-semibold mb-2">Interest Tiers</div>
+                                        <TooltipContent className="p-3 w-56">
+                                            <div className="space-y-1">
+                                                <div className="font-semibold mb-2">Interest Tiers</div>
 
-          {scheme?.interestTiers?.length ? (
-            [...scheme.interestTiers]
-              .sort((a, b) => a.duration - b.duration)
-              .map((tier, index) => (
-                <div
-                  key={index}
-                  className="flex justify-between text-sm"
-                >
-                  <span>Month {tier.duration}</span>
-                  <span>{tier.rate}%</span>
-                </div>
-              ))
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              No interest tiers configured
-            </div>
-          )}
-        </div>
-      </TooltipContent>
-    </Tooltip>
-  </TooltipProvider>
-</div>
-<div className="flex justify-between">
-  <span className="text-muted-foreground">
-    Current Interest:
-  </span>
+                                                {scheme?.interestTiers?.length ? (
+                                                    [...scheme.interestTiers]
+                                                        .sort((a, b) => a.duration - b.duration)
+                                                        .map((tier, index) => (
+                                                            <div
+                                                                key={index}
+                                                                className="flex justify-between text-sm"
+                                                            >
+                                                                <span>Month {tier.duration}</span>
+                                                                <span>{tier.rate}%</span>
+                                                            </div>
+                                                        ))
+                                                ) : (
+                                                    <div className="text-sm text-muted-foreground">
+                                                        No interest tiers configured
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                    Current Interest:
+                                </span>
 
-  <span className="font-semibold text-amber-600">
-    {rate}% P.M
-  </span>
-</div>
+                                <span className="font-semibold text-amber-600">
+                                    {rate}% P.M
+                                </span>
+                            </div>
                             {pledge.documentCharges && pledge.documentCharges > 0 && (
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Document Charges:</span>
@@ -427,7 +427,11 @@ export default function PledgeDetailPage() {
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Loan Amount:</span>
-                                    <span className="font-mono font-bold">₹{pledge.bankCoverage.bankLoanAmount.toLocaleString('en-IN')}</span>
+                                    <span className="font-mono font-bold">
+                                        {typeof pledge.bankCoverage?.bankLoanAmount === 'number'
+                                            ? `₹${pledge.bankCoverage.bankLoanAmount.toLocaleString('en-IN')}`
+                                            : '—'}
+                                    </span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Loan Date:</span>
